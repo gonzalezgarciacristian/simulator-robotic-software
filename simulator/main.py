@@ -3,7 +3,7 @@ import graphics.gui as gui
 
 
 def main():
-    app = gui.MainApplication()
+    app = gui.LoginApplication(False)#gui.MainApplication()
     app.mainloop()
 
 

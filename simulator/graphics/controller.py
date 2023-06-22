@@ -6,11 +6,11 @@ import graphics.screen_updater as screen_updater
 
 class RobotsController:
 
-    def __init__(self, view):
+    def __init__(self, view, username, lab, group):
         self.view = view
         self.console: console.Console = None
         self.robot_layer: layers.Layer = None
-        self.compile_command = commands.Compile(self)
+        self.compile_command = commands.Compile(self, username, lab, group)
         self.setup_command = commands.Setup(self)
         self.loop_command = commands.Loop(self)
         self.executing = False

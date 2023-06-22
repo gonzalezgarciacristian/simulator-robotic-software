@@ -1,3 +1,4 @@
+import json
 import traceback
 import importlib.util
 import sys
@@ -7,6 +8,7 @@ import compiler.transpiler as transpiler
 import libraries.standard as standard
 import libraries.serial as serial
 import robot_components.robot_state as state
+import requests
 
 module = None
 
@@ -40,15 +42,77 @@ class Command:
         serial.cons = self.controller.console
         self.ready = True
 
+class ExecutionInfo(object):
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__,
+            sort_keys=True, indent=4)
 
 class Compile(Command):
 
-    def __init__(self, controller):
+    def __init__(self, controller, username, lab, group):
         super().__init__(controller)
+        self.username = username
+        self.lab = lab
+        self.group = group
 
     def execute(self):
         try:
+            #aqui se obtienen los warns y los errores
+            #login de uos
+            #scikit learn
             warns, errors = transpiler.transpile(self.controller.get_code())
+
+            errores = []
+            warnings = []
+
+            for e in errors:
+                errores.append({
+                    "columna": e.column,
+                    "linea": e.line,
+                    "mensaje": e.message,
+                    "tipoError": e.r_type,
+                    "error": e.to_string
+                })
+
+            for e in warns:
+                warnings.append({
+                    "columna": e.column,
+                    "linea": e.line,
+                    "mensaje": e.message,
+                    "tipoError": e.r_type,
+                    "error": e.to_string
+                })
+
+            infoeje = ExecutionInfo()
+            infoeje.warns = warnings
+            infoeje.errores = errores
+            infoeje.codigo = self.controller.get_code()
+
+            infoeje.username = self.username
+            infoeje.lab = self.lab
+            infoeje.group = self.group
+
+            try:
+                r = requests.post('http://147.189.171.97:8000/insertaEjecucion',
+                                 headers={'Accept': 'application/json'}, json=infoeje.toJSON())
+
+                print(r)
+            except requests.exceptions.ConnectionError as ce:
+                print(f'la excepción es {ce}')
+                traceback.print_exc()
+                self.controller.console.write_error(
+                    console.Error("Error de conexión", 0, 0, "El sketch no se ha podido enviar correctamente y"
+                                                             " se ha guardado la información de la ejecución en el "
+                                                             "archivo executions.txt. Si es necesario"
+                                                             " avisa a tu profesor"))
+
+                with open('executions.txt', 'a') as file:
+                    file.write(infoeje.toJSON())
+                    file.write("--------------------------------------------------------")
+                    file.close()
+
+
+
             if len(errors) > 0:
                 self.print_errors(errors)
                 return False

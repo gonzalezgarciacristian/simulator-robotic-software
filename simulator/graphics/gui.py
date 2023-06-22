@@ -1,21 +1,177 @@
+import base64
+import json
+import os
 import re
 import tkinter as tk
 import tkinter.messagebox as messagebox
+import traceback
+from time import sleep
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 import tkinter.ttk as ttk
+
+import cryptography
+import requests
+
 import graphics.controller as controller
 import files.files_reader as files
 import subprocess
+
+from functools import partial
+from tkinter import Label, Entry, StringVar, Button
+
+import bcrypt
+
+from cryptography.fernet import Fernet
+
+from output import console
 
 DARK_BLUE = "#006468"
 BLUE = "#17a1a5"
 
 
+class LoginInfo(object):
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__,
+                          sort_keys=True, indent=4)
+
+class LoginApplication(tk.Tk):
+
+    def validateLogin(self, username, password, lab, group, fromFile):
+
+        if fromFile:
+            infoLogin = LoginInfo()
+            infoLogin.username = username
+            #infoLogin.pw = password
+            infoLogin.lab = lab
+            infoLogin.group = group
+            infoLogin.fromFile = fromFile
+        else:
+            infoLogin = LoginInfo()
+            infoLogin.username = username.get().upper()
+            #infoLogin.pw = password.get()
+            infoLogin.lab = lab.get()
+            infoLogin.group = group.get()
+            infoLogin.fromFile = fromFile
+
+        print("checking login for :", infoLogin.username.upper())
+
+        try:
+            r = requests.post('http://147.189.171.97:8000/infoLogin',
+                              headers={'Accept': 'application/json'}, json=infoLogin.toJSON())
+
+            if fromFile:
+                infoLogin.pw = password
+            else:
+                infoLogin.pw = password.get()
+
+            if r.status_code == 200:
+                #comprobamos que el login es correcto
+                if ((len(r.content) == 0 and not fromFile)
+                        or (not fromFile and bcrypt.checkpw(infoLogin.pw.encode('utf8'), r.content))
+                        or (fromFile and r.content.decode() == infoLogin.pw)):
+                #generamos el archivo con la pw hasheada si no es login desde archivo
+                #if not fromFile:
+
+                    r = requests.post('http://147.189.171.97:8000/updateLogin',
+                                     headers={'Accept': 'application/json'}, json=infoLogin.toJSON())
+
+                    with open('login.txt', 'w') as f:
+                        key = Fernet.generate_key()
+                        fernet = Fernet(key)
+
+
+                        infolg = fernet.encrypt((infoLogin.username + "\n" + r.content.decode() + "\n" + infoLogin.lab + "\n" + infoLogin.group).encode('utf-8'))
+                        f.write(key.decode('utf-8') + "\n" + infolg.decode('utf-8'))
+
+                        f.close()
+
+                    self.destroy()
+                    tk.messagebox.showinfo(title="Sesión Iniciada", message="Has iniciado sesión como " + infoLogin.username+
+                                           ", Laboratorio: " + infoLogin.lab + ", Grupo: " + infoLogin.group)
+                    app = MainApplication(infoLogin.username.upper(), infoLogin.lab, infoLogin.group)
+                    app.mainloop()
+                    return ""
+
+                tk.messagebox.showerror(title="Error", message='Credenciales Incorrectas')
+                return r
+            mensajeerror = re.search('<p>(.+?)</p>', r.content.decode()).group(1)
+
+            tk.messagebox.showerror(title="Error", message=mensajeerror)
+            return r
+        except Exception as e:
+            mensajeerror = str(e)
+
+            tk.messagebox.showerror(title="Error", message=mensajeerror)
+            return ""
+
+    def __init__(self, logout, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+
+        self.geometry('250x150')
+        self.eval('tk::PlaceWindow . center') #la centramos
+        self.title('Login Simulador Software para Robots')
+
+        # username label and text entry box
+        usernameLabel = Label(self, text="UO*").grid(row=0, column=0)
+        username = StringVar()
+        usernameEntry = Entry(self, textvariable=username).grid(row=0, column=1)
+
+        # password label and password entry box
+        passwordLabel = Label(self, text="Contraseña*").grid(row=1, column=0)
+        password = StringVar()
+        passwordEntry = Entry(self, textvariable=password, show='*').grid(row=1, column=1)
+
+        # laboratory label and laboratory entry box
+        labLabel = Label(self, text="Laboratorio").grid(row=2, column=0)
+        lab = StringVar()
+        labEntry = Entry(self, textvariable=lab).grid(row=2, column=1)
+
+        # group label and group entry box
+        groupLabel = Label(self, text="Grupo").grid(row=3, column=0)
+        group = StringVar()
+        groupEntry = Entry(self, textvariable=group).grid(row=3, column=1)
+
+        validateLogin = partial(self.validateLogin, username, password, lab, group, False)
+
+        # login button
+        loginButton = Button(self, text="Iniciar Sesión", command=validateLogin).grid(row=5, column=0)
+
+        #comprobamos si existe archivo de login, si existe validamos login
+        if (not logout):
+            try:
+                with open('login.txt', 'r') as file:
+                    data = file.read().replace('\n', ' ')
+                    file.close()
+                    li = list(data.split(" "))
+                    if len(li) == 2:
+
+                        fernet = Fernet(li[0].encode('utf-8'))
+                        try:
+                            decrypted = fernet.decrypt(li[1].encode('utf-8')).decode('utf-8')
+                            decrypted = decrypted.replace('\n', ' ')
+                            li = list(decrypted.split(" "))
+                            if len(li) == 4:
+                                self.validateLogin(li[0], li[1], li[2], li[3], True)
+                        except cryptography.fernet.InvalidToken:
+                            tk.messagebox.showerror(title="Error", message='Credenciales de Archivo Incorrectas')
+
+            except FileNotFoundError:
+                print("The 'login.txt' file does not exist")
+
+            #self.mainloop()
+        else:
+            try:
+                os.remove('login.txt')
+            except OSError as e:
+                print("Error: %s : %s" % ('login.txt', e.strerror))
+
+
 class MainApplication(tk.Tk):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, username, lab, group, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-        self.title("Simulador Software para Robots")
+
+        self.title("Simulador Software para Robots - " + username + " Lab: " + lab + " Grupo: " + group)
         self.geometry("1280x720")
         # self.iconbitmap('assets/simlogo.ico')
 
@@ -36,7 +192,7 @@ class MainApplication(tk.Tk):
             self.vertical_pane, self, bg=DARK_BLUE)
 
         self.identifier = None
-        self.controller = controller.RobotsController(self)
+        self.controller = controller.RobotsController(self, username, lab, group)
         self.prepare_controller()
         self.keys_used = True
         self.file_manager = files.FileManager()
@@ -120,6 +276,44 @@ class MainApplication(tk.Tk):
 
     def zoom_out(self):
         self.controller.zoom_out()
+
+    def check_if_executions(self):
+        try:
+            with open('executions.txt', 'r') as file:
+                contents = file.read()
+                print(contents)
+                jotasones = contents.split("--------------------------------------------------------")
+                for jeson in (jotasones):
+                    print(jeson)
+                    if len(jeson) > 0:
+                        try:
+                            r = requests.post('http://147.189.171.97:8000/insertaEjecucion',
+                                              headers={'Accept': 'application/json'}, json=jeson)
+
+                            print(r)
+                        except requests.exceptions.ConnectionError as ce:
+                            print(f'la excepción es {ce}')
+                            traceback.print_exc()
+                            self.controller.console.write_error(
+                                console.Error("Error de conexión", 0, 0,
+                                              "Las ejecuciones del "
+                                              "archivo executions.txt no se han podido enviar correctamente."
+                                              " Si es necesario avisa a tu profesor"))
+                            break
+
+                        sleep(0.50)
+
+                file.close()
+
+                messagebox.showinfo('Ejecuciones enviadas',
+                                    "Se han enviado correctamente las ejecuciones del archivo executions.txt.")
+                os.remove('executions.txt')
+
+        except FileNotFoundError:
+            print("The 'executions.txt' file does not exist")
+            messagebox.showinfo('No existe el archivo',
+                                "No existe el archivo executions.txt con las ejecuciones a enviar.")
+
 
     def change_zoom_label(self, zoom_level):
         self.drawing_frame.change_zoom_label(zoom_level)
@@ -524,6 +718,8 @@ class MenuBar(tk.Menu):
             label="Guardar sketch", command=application.save_file, accelerator="Ctrl+S")
         file_menu.add_separator()
         file_menu.add_command(
+            label="Cerrar Sesión", command=self.check_if_logout, accelerator="Alt+F3")
+        file_menu.add_command(
             label="Salir", command=self.check_if_exit, accelerator="Alt+F4")
         self.add_cascade(label="Archivo", menu=file_menu)
 
@@ -544,6 +740,8 @@ class MenuBar(tk.Menu):
             label="Ejecutar", command=application.execute, accelerator="F5")
         exec_menu.add_command(
             label="Detener", command=application.stop, accelerator="Ctrl+F5")
+        exec_menu.add_command(
+            label="Enviar ejecuciones", command=application.check_if_executions, accelerator="Ctrl+F6")
         exec_menu.add_separator()
         exec_menu.add_command(
             label="Ampliar", command=lambda event: application.zoom_in(), accelerator="Ctrl++")
@@ -576,6 +774,13 @@ class MenuBar(tk.Menu):
         if messagebox.askyesno('Nuevo archivo',
                                '¿Seguro que quieres crear un nuevo archivo? Se perderá el sketch si no está guardado'):
             self.application.editor_frame.create_file()
+
+    def check_if_logout(self):
+        if messagebox.askyesno('Cerrar Sesión', '¿Seguro que quieres cerrar sesión? Se perderá el sketch si no está guardado'):
+            self.application.close()
+            app = LoginApplication(True)
+            app.mainloop()
+
 
     def check_if_exit(self):
         if messagebox.askyesno('Salir', '¿Seguro que quieres salir? Se perderá el sketch si no está guardado'):

@@ -280,7 +280,7 @@ class MobileRobotLayer(Layer):
         self.robot_drawing.sensors["sound"].set_detect(detecting)
         self.robot.sound.value = 1 if detecting else 0
         self.robot.sound.dist = dist_cm if detecting else -1
-        self.hud.set_detect_obstacle([dist_cm if detecting else -1])
+        self.hud.set_detect_obstacle([dist_cm if detecting else -1], unit="cm")
     # ----------------------------------------------- Fin Gemelo digital (reflejo)
 
     def set_circuit(self, circuit_opt):

@@ -48,7 +48,7 @@ class CapaFalsa:
             self.robot_drawing.change_angle(delta_angulo)
 
 
-def crear_capa_movimiento_continuo(velocidad=0, delta_angulo=0):
+def create_continuous_move_layer(velocidad=0, delta_angulo=0):
     """Crea una capa falsa con la intención de movimiento en vivo ya fijada."""
     capa = CapaFalsa()
     capa.last_v = velocidad
@@ -63,7 +63,7 @@ class TestCocheReflejo(unittest.TestCase):
         self.traductor = translators.CarTranslator()
         self.capa = CapaFalsa()
 
-    def test_ordenes_medidas_repetidas_mueven_cada_vez(self):
+    def test_repeated_measured_orders_move_each_time(self):
         # Bug: dos 'I C 32' seguidas dan el mismo reporte (5,32,32); sin reiniciar la base
         # el segundo incremento sería 0 y el simulador no giraría. Cada orden debe reiniciar
         # la base.
@@ -76,7 +76,7 @@ class TestCocheReflejo(unittest.TestCase):
         self.traductor.apply_to_sim(self.capa, self.traductor.decode("5,32,32"))
         self.assertAlmostEqual(self.capa.robot_drawing.girado, 2 * grados)  # 2ª: +90° más
 
-    def test_giro_izquierda_y_derecha_signos_opuestos(self):
+    def test_left_and_right_turn_opposite_signs(self):
         self.traductor.encode("I C 32")
         self.traductor.apply_to_sim(self.capa, self.traductor.decode("5,32,32"))
         izquierda = self.capa.robot_drawing.girado
@@ -86,7 +86,7 @@ class TestCocheReflejo(unittest.TestCase):
         self.assertAlmostEqual(self.capa.robot_drawing.girado, 0.0)
         self.assertGreater(izquierda, 0.0)
 
-    def test_autonomo_refleja_sin_orden_previa(self):
+    def test_autonomous_reflects_without_prior_order(self):
         # En autónomo el simulador NO ha emitido ninguna orden (_last_motion arranca en None):
         # el sentido lo trae cada trama en el 4º campo. Un lado (A) avanza; una esquina (D) gira.
         self.traductor.apply_to_sim(self.capa, self.traductor.decode("5,50,50,0"))  # avanzar (A)
@@ -100,10 +100,10 @@ class TestCocheReflejo(unittest.TestCase):
                   * translators.CarTranslator.FACTOR_CONVERSION_GRADOS_SIM_POR_CAMBIO_COCHE)
         self.assertAlmostEqual(self.capa.robot_drawing.girado, -grados)  # D -> grados negativos
 
-    def test_movimiento_continuo_acumulado_creciente(self):
+    def test_continuous_move_accumulates_growing(self):
         # En movimiento continuo el microcontrolador NO reinicia entre tramas (idempotente):
         # el reporte crece y el simulador aplica solo el incremento de cada trama.
-        self.traductor.drive_from_sim(crear_capa_movimiento_continuo(delta_angulo=5))  # fija 'I'
+        self.traductor.drive_from_sim(create_continuous_move_layer(delta_angulo=5))  # fija 'I'
         self.traductor.apply_to_sim(self.capa, self.traductor.decode("5,10,10"))
         self.traductor.apply_to_sim(self.capa, self.traductor.decode("5,20,20"))
         grados = (20

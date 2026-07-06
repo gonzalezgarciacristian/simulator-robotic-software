@@ -5,5 +5,5 @@ gemelo digital de un robot:
 
 - ``secure_config``  — lectura/escritura de configuración con valores cifrados.
 - ``twin_identity``  — identidad estable por theme (clientID y temas pub/sub).
-- ``mqtt_twin``      — cliente MQTT (paho) con cola de eventos thread-safe.
+- ``mqtt_adapter``   — cliente MQTT (paho) con cola de eventos thread-safe.
 """

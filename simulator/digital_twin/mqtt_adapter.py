@@ -25,8 +25,14 @@ except Exception:  # pragma: no cover - depende de la versión instalada
 
 import digital_twin.twin_identity as twin_identity
 
+# Centinela de presencia: al conectar, el simulador lo publica en su topic de
+# salida para que el broker lo registre como publicador del tema. No es una
+# orden ni una trama de datos: el dispositivo que lo reciba lo descarta sin
+# procesarlo. Debe coincidir con TwinNode::HOLA del firmware Arduino.
+HELLO = "hello"
 
-class DigitalTwinClient:
+
+class MQTTAdapter:
 
     def __init__(self, theme, host, port, identity=None):
         self.theme = theme

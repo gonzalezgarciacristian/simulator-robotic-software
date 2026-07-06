@@ -65,6 +65,3 @@ def test():
     warning_analysis = warnings.WarningAnalyzer()
     sem_analysis = semantical_analysis.Semantic(lib_manager)
     return sem_analysis.execute(ast)
-
-f = open('tests/file-tests/arrays.txt').read()
-transpile(f)

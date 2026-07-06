@@ -4,7 +4,7 @@ import output.console as console
 import output.console_gamification as console_gamification
 import compiler.commands as commands
 import graphics.screen_updater as screen_updater
-import digital_twin.mqtt_twin as mqtt_twin
+import digital_twin.mqtt_adapter as mqtt_adapter
 import digital_twin.secure_config as secure_config
 import digital_twin.twin_identity as twin_identity
 import digital_twin.translators as translators
@@ -114,7 +114,7 @@ class RobotsController:
                 "Gemelo digital: no se pudo leer la configuración del broker ("
                 + str(error) + ").\n")
             return
-        client = mqtt_twin.DigitalTwinClient(
+        client = mqtt_adapter.MQTTAdapter(
             theme, host, port, self._twin_identity)
         try:
             client.connect_async()
@@ -339,6 +339,10 @@ class RobotsController:
                 # desplazamiento local para que el teclado no pelee con la pose reflejada.
                 if self.translator is not None:
                     self.translator.attach(self.robot_layer)
+                # Presencia: anuncia el simulador en su topic de salida para que el
+                # broker lo registre como publicador del tema. El dispositivo lo
+                # descarta sin procesarlo (ver TwinNode::reenvioMqtt).
+                self.twin_client.publish_text(mqtt_adapter.HELLO)
                 self.console.write_output(
                     "Gemelo digital conectado — pub: " + self.twin_client.pub_topic
                     + " · sub: " + self.twin_client.sub_topic + "\n")
@@ -354,6 +358,10 @@ class RobotsController:
                     "Gemelo digital: no se pudo conectar al broker.\n")
                 self._teardown_twin(announce=False)
         elif kind == "message":
+            # Centinela de presencia del dispositivo: se descarta sin procesar ni
+            # imprimir (solo sirve para registrar al publicador en el broker).
+            if event[2] == mqtt_adapter.HELLO:
+                return
             if self._apply_twin_position(event[2]):
                 return
             self.console.write_output(

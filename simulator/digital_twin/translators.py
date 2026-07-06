@@ -34,7 +34,7 @@ class TwinTranslator:
     del comando concreto y devuelve la trama compacta. El control ``C O``/``C F`` y el
     parseo de valores numéricos son comunes a todos los robots y viven aquí.
 
-    Las subclases definen su vocabulario en ``_command_handlers`` (mapa cabecera -> método)
+    Las subclases definen su vocabulario en ``_command_encoders`` (mapa cabecera -> método)
     y, si procede, sobreescriben ``decode``/``drive_from_sim``/``apply_to_sim`` y los
     enganches de anclaje (``attach``/``detach``/``on_control_activated``).
     """
@@ -47,12 +47,12 @@ class TwinTranslator:
         head = tokens[0].upper()
         if head == "C":
             return self._encode_control(tokens)
-        handler = self._command_handlers().get(head)
+        handler = self._command_encoders().get(head)
         if handler is None:
             raise TranslationError("comando desconocido: " + tokens[0])
         return handler(tokens)
 
-    def _command_handlers(self):
+    def _command_encoders(self):
         """Mapa cabecera (mayúsculas) -> método que recibe los tokens. Lo define cada
         subclase con su vocabulario propio."""
         raise NotImplementedError
@@ -77,7 +77,7 @@ class TwinTranslator:
         return "0,0"
 
     @staticmethod
-    def _parse_valor(raw, as_float):
+    def _parse_value(raw, as_float):
         """Valida y normaliza un valor numérico positivo. ``as_float`` decide si se
         admite decimal (distancia/grados) o solo entero (cambios)."""
         try:
@@ -155,15 +155,15 @@ class ActuatorTranslator(TwinTranslator):
     _DIR = {"M": 0, "S": 1}   # lado del actuador: Motor / Sensor
     _MODO = {"C": 0, "D": 1}  # interpretación del valor: Cambios / Distancia (mm)
 
-    def _command_handlers(self):
+    def _command_encoders(self):
         return {
-            "L": self._encode_limite,
+            "L": self._encode_limit,
             "STOP": self._encode_stop,
             "J": self._encode_jog,
-            "M": self._encode_movimiento,
+            "M": self._encode_movement,
         }
 
-    def _encode_limite(self, tokens):
+    def _encode_limit(self, tokens):
         if len(tokens) != 2 or tokens[1].upper() not in self._DIR:
             raise TranslationError("uso: 'L M' o 'L S'")
         return "2,{}".format(self._DIR[tokens[1].upper()])
@@ -183,7 +183,7 @@ class ActuatorTranslator(TwinTranslator):
             raise TranslationError("uso: 'J M' | 'J S' | 'J P'")
         return "3,{}".format(self._DIR[arg])
 
-    def _encode_movimiento(self, tokens):
+    def _encode_movement(self, tokens):
         if len(tokens) != 4:
             raise TranslationError("uso: 'M <M|S> <C|D> <valor>'")
         direccion = tokens[1].upper()
@@ -192,7 +192,7 @@ class ActuatorTranslator(TwinTranslator):
             raise TranslationError("dirección debe ser M (motor) o S (sensor)")
         if modo not in self._MODO:
             raise TranslationError("modo debe ser C (cambios) o D (distancia)")
-        valor = self._parse_valor(tokens[3], as_float=(modo == "D"))
+        valor = self._parse_value(tokens[3], as_float=(modo == "D"))
         return "1,{},{},{}".format(self._DIR[direccion], self._MODO[modo], valor)
 
     # ---- lazo cerrado ----
@@ -320,49 +320,49 @@ class CarTranslator(TwinTranslator):
         self._prev_der = 0
         self._prev_izq = 0
 
-    def _command_handlers(self):
+    def _command_encoders(self):
         # Cada sentido es su propia cabecera. El jog/STOP no se exponen aquí (control en
         # vivo por WASD).
         return {
-            "A": self._encode_avanzar,
-            "R": self._encode_retroceder,
-            "I": self._encode_izquierda,
-            "D": self._encode_derecha,
+            "A": self._encode_forward,
+            "R": self._encode_backward,
+            "I": self._encode_left,
+            "D": self._encode_right,
         }
 
-    def _encode_avance(self, tokens, dir_code, sentido, cabecera):
+    def _encode_linear_move(self, tokens, dir_code, sentido, cabecera):
         # A/R <C|D> <valor> -> 1,<0=A|1=R>,<0=C|1=D>,<valor>
         if len(tokens) != 3:
             raise TranslationError("uso: '" + cabecera + " <C|D> <valor>'")
         modo = tokens[1].upper()
         if modo not in self._MOV_MODO:
             raise TranslationError("modo debe ser C (cambios) o D (distancia)")
-        valor = self._parse_valor(tokens[2], as_float=(modo == "D"))
+        valor = self._parse_value(tokens[2], as_float=(modo == "D"))
         self._begin_command(sentido)
         return "1,{},{},{}".format(dir_code, self._MOV_MODO[modo], valor)
 
-    def _encode_avanzar(self, tokens):
-        return self._encode_avance(tokens, 0, "A", "A")
+    def _encode_forward(self, tokens):
+        return self._encode_linear_move(tokens, 0, "A", "A")
 
-    def _encode_retroceder(self, tokens):
-        return self._encode_avance(tokens, 1, "R", "R")
+    def _encode_backward(self, tokens):
+        return self._encode_linear_move(tokens, 1, "R", "R")
 
-    def _encode_giro(self, tokens, dir_code, sentido, cabecera):
+    def _encode_turn(self, tokens, dir_code, sentido, cabecera):
         # I/D <C|G> <valor> -> 2,<0=I|1=D>,<0=C|1=G>,<valor>
         if len(tokens) != 3:
             raise TranslationError("uso: '" + cabecera + " <C|G> <valor>'")
         modo = tokens[1].upper()
         if modo not in self._TURN_MODO:
             raise TranslationError("modo debe ser C (cambios) o G (grados)")
-        valor = self._parse_valor(tokens[2], as_float=(modo == "G"))
+        valor = self._parse_value(tokens[2], as_float=(modo == "G"))
         self._begin_command(sentido)
         return "2,{},{},{}".format(dir_code, self._TURN_MODO[modo], valor)
 
-    def _encode_izquierda(self, tokens):
-        return self._encode_giro(tokens, 0, "I", "I")
+    def _encode_left(self, tokens):
+        return self._encode_turn(tokens, 0, "I", "I")
 
-    def _encode_derecha(self, tokens):
-        return self._encode_giro(tokens, 1, "D", "D")
+    def _encode_right(self, tokens):
+        return self._encode_turn(tokens, 1, "D", "D")
 
     # ---- lazo cerrado ----
     def decode(self, text):

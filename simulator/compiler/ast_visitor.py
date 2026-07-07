@@ -142,6 +142,10 @@ class ASTVisitor:
         self.visit_children(case.sentences, param)
         return None
 
+    def visit_block(self, block: ast.BlockNode, param):
+        self.visit_children(block.sentences, param)
+        return None
+
     def visit_array_access(self, array_access: ast.ArrayAccessNode, param):
         self.visit_children(array_access.indexes, param)
         return None
@@ -174,11 +178,20 @@ class ASTVisitor:
             bitwise_expression.right.accept(self, param)
         return None
 
-    def visit_compound_assigment(self, compound_asigment: ast.CompoundAssignmentNode, param):
-        if compound_asigment.left is not None:
-            compound_asigment.left.accept(self, param)
-        if compound_asigment.right is not None:
-            compound_asigment.right.accept(self, param)
+    def visit_compound_assignment(self, compound_assignment: ast.CompoundAssignmentNode, param):
+        if compound_assignment.left is not None:
+            compound_assignment.left.accept(self, param)
+        if compound_assignment.right is not None:
+            compound_assignment.right.accept(self, param)
+        return None
+
+    def visit_conditional_expression(self, conditional_expression: ast.ConditionalExpressionNode, param):
+        if conditional_expression.condition is not None:
+            conditional_expression.condition.accept(self, param)
+        if conditional_expression.true_expr is not None:
+            conditional_expression.true_expr.accept(self, param)
+        if conditional_expression.false_expr is not None:
+            conditional_expression.false_expr.accept(self, param)
         return None
 
     def visit_inc_dec_expression(self, inc_dec_expression: ast.IncDecExpressionNode, param):
@@ -218,6 +231,9 @@ class ASTVisitor:
         return None
 
     def visit_boolean(self, boolean_node: ast.BooleanNode, param):
+        return None
+
+    def visit_null_ptr(self, null_ptr_node: ast.NullPtrNode, param):
         return None
 
     def visit_id(self, id_node: ast.IDNode, param):

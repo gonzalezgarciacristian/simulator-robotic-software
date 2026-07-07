@@ -3,13 +3,26 @@ Standard Arduino library. Includes the methods pressent
 at: https://www.arduino.cc/reference/en/
 """
 
+import builtins
 import string
 import time
+import threading
 import random as ran
 from math import cos, sin, sqrt, tan
 import robot_components.boards as boards
 import robot_components.robot_state as robot_state
 import graphics.screen_updater as screen_updater
+
+# Evento global que interrumpe delay()/delayMicroseconds() cuando se detiene la ejecución.
+# Loop.reboot() lo activa; Loop.execute() lo limpia antes de arrancar el hilo nuevo.
+_stop_event = threading.Event()
+_watchdog_local = threading.local()
+
+# Limita la CPU consumida por sketches que giran sin delay() ni esperas cooperativas.
+_WATCHDOG_TIME_SLICE_NS = 8_000_000
+_WATCHDOG_IDLE_SLEEP_S = 0.001
+_WATCHDOG_CHECK_EVERY = 128
+_WATCHDOG_CHECK_MASK = _WATCHDOG_CHECK_EVERY - 1
 
 HIGH = 1
 LOW = 0
@@ -25,6 +38,63 @@ NOT_IMPL_WARNING = -2
 board: boards.Board = None
 state: robot_state.State = None
 start = time.time()
+
+
+class ExecutionInterrupted(Exception):
+    """Parada cooperativa solicitada por stop/reset del simulador."""
+    pass
+
+
+class Ref:
+    """Contenedor mutable para simular parametros C/C++ pasados por referencia."""
+
+    def __init__(self, value=None):
+        self.value = value
+
+    def __repr__(self):
+        return repr(self.value)
+
+    def __str__(self):
+        return str(self.value)
+
+
+def reset_runtime_watchdog():
+    """Reinicia el estado local del watchdog para el hilo actual."""
+    _watchdog_local.spin_count = 0
+    _watchdog_local.last_pause_ns = time.perf_counter_ns()
+
+
+def note_runtime_blocking():
+    """Marca que el sketch acaba de ceder CPU mediante una espera real."""
+    reset_runtime_watchdog()
+
+
+def runtime_watchdog_checkpoint():
+    """Punto cooperativo de seguridad insertado en el código transpilado."""
+    if _stop_event.is_set():
+        raise ExecutionInterrupted()
+
+    spin_count = getattr(_watchdog_local, "spin_count", 0) + 1
+    _watchdog_local.spin_count = spin_count
+
+    if spin_count & _WATCHDOG_CHECK_MASK:
+        return
+
+    now = time.perf_counter_ns()
+    last_pause_ns = getattr(_watchdog_local, "last_pause_ns", now)
+    if now - last_pause_ns < _WATCHDOG_TIME_SLICE_NS:
+        return
+
+    if threading.current_thread() is threading.main_thread():
+        screen_updater.refresh()
+        time.sleep(0)
+    else:
+        time.sleep(_WATCHDOG_IDLE_SLEEP_S)
+
+    reset_runtime_watchdog()
+
+    if _stop_event.is_set():
+        raise ExecutionInterrupted()
 
 
 def get_name():
@@ -76,11 +146,14 @@ def get_methods():
     methods["abs"] = ("double", "abs", ["int"], -1)
     methods["constrain"] = ("double", "constrain", [
                             "double", "double", "double"], -1)
+    methods["F"] = ("string", "F", ["string"], -1)
     methods["map"] = ("int", "map", ["int", "int", "int", "int", "int"], -1)
     methods["max"] = ("double", "max", ["double", "double"], -1)
     methods["min"] = ("double", "min", ["double", "double"], -1)
     methods["pow"] = ("double", "pow", ["float", "float"], -1)
+    methods["sizeof"] = ("int", "sizeof", ["any"], -1)
     methods["sq"] = ("double", "sq", ["double"], -1)
+    methods["strtol"] = ("long", "strtol", ["any", "ref", "int"], -1)
     methods["sqrt"] = ("double", "sqrt", ["double"], -1)
 
     # Trigonometry
@@ -313,9 +386,25 @@ def delay(ms):
     Arguments:
         ms: the number of milliseconds to pause
     """
-    state.exec_time_ms = int(time.time_ns() / 1000000) + ms
-    while time.time_ns() / 1000000 < state.exec_time_ms:
-        screen_updater.refresh()
+    ms = max(0, int(ms))
+    if state is not None:
+        state.exec_time_ms = int(time.time_ns() / 1000000) + ms
+
+    seconds = ms / 1000.0
+    if threading.current_thread() is threading.main_thread():
+        deadline = time.monotonic() + seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            if _stop_event.wait(min(remaining, 0.016)):
+                break
+            screen_updater.refresh()
+    else:
+        # _stop_event.wait() duerme el tiempo pedido pero despierta inmediatamente
+        # si se activa el evento (stop/reset), haciendo el delay() interrumpible.
+        _stop_event.wait(seconds)
+    note_runtime_blocking()
 
 
 def delay_microseconds(us):
@@ -356,7 +445,7 @@ def abs(x):
     Returns:
         the absolute value
     """
-    return abs(x)
+    return builtins.abs(x)
 
 
 def constrain(x, a, b):
@@ -375,6 +464,33 @@ def constrain(x, a, b):
         return a
     else:
         return b
+
+
+def F(value):
+    return value
+
+
+def sizeof(value):
+    try:
+        return len(value)
+    except TypeError:
+        return 1
+
+
+def strtol(value, end=None, base=10):
+    try:
+        if hasattr(value, "string"):
+            value = value.string
+        if isinstance(value, list):
+            value = "".join(str(item) for item in value).split("\0", 1)[0]
+        parsed = int(str(value).strip(), int(base))
+        if isinstance(end, Ref):
+            end.value = "\0"
+        return parsed
+    except (TypeError, ValueError):
+        if isinstance(end, Ref):
+            end.value = value
+        return 0
 
 
 def map(value, from_low, from_high, to_low, to_high):

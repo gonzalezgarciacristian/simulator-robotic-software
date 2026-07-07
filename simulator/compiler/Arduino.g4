@@ -28,11 +28,19 @@ declaration
        ;
 
 simple_declaration 
-       : v_type=var_type ID ('=' val=expression)? 
+       : (ptr_type='char' pointer_ref+ | v_type=var_type) var_name=ID ('=' val=expression)? 
        ;
 
 array_declaration
-       : v_type=var_type ID a_index=array_index ('=' (expr=expression | elems=array_elements))? 
+       : v_type=var_type var_name=ID a_index=array_index ('=' (expr=expression | elems=array_elements))? 
+       ;
+
+pointer_ref
+       : '*'
+       ;
+
+reference_ref
+       : '&'
        ;
 
 define_macro
@@ -70,11 +78,15 @@ var_type
        ;
 
 function 
-       : v_type=var_type ID '(' f_args=function_args? ')' '{' sentences+=sentence* '}'
+       : qual=('const' | 'static')? (ptr_type='char' pointer_ref+ | v_type=var_type) f_name=ID '(' f_args=function_args? ')' '{' sentences+=sentence* '}'
        ;
 
 function_args
-       : f_args+=declaration (',' f_args+=declaration)*
+       : f_args+=function_arg (',' f_args+=function_arg)*
+       ;
+
+function_arg
+       : qual=('const' | 'static')? (ptr_type='char' pointer_ref+ | v_type=var_type reference_ref?) var_name=ID ('=' val=expression)?
        ;
 
 iteration_sentence 
@@ -102,12 +114,17 @@ sentence
        : dec=declaration ';'
        | it_sent=iteration_sentence
        | cond_sent=conditional_sentence
+       | scope_block=scoped_block
        | assign=assignment ';'
        | expr=expression ';'
        | def_mac=define_macro
        | s_type='return' expr=expression? ';'
        | s_type='break' ';'
        | s_type='continue' ';'
+       ;
+
+scoped_block
+       : '{' sentences+=sentence* '}'
        ;
 
 assignment
@@ -130,6 +147,7 @@ expression
        | FLOAT_CONST
        | CHAR_CONST
        | STRING_CONST
+       | 'nullptr'
        | ID
        | '(' r_expr=expression ')'
        | member_acc=expression '.' id_acc=ID
@@ -138,6 +156,7 @@ expression
        | conv=conversion
        | expr=expression operator=('++'|'--')
        | operator=('++'|'--') expr=expression
+       | operator=('+'|'-'|'*'|'&') expr=expression
        | operator=('!'|'~') expr=expression
        | left=expression operator=('*'|'/'|'%') right=expression
        | left=expression operator=('+'|'-') right=expression
@@ -149,6 +168,7 @@ expression
        | left=expression operator='|' right=expression
        | left=expression operator='&&' right=expression
        | left=expression operator='||' right=expression
+       | cond=expression '?' true_expr=expression ':' false_expr=expression
        | left=expression operator=('%='|'&='|'*='|'+='|'-='|'/='|'^='|'|=') right=expression
        ;
 

@@ -10,9 +10,14 @@ arduino-examples.zip
 examples/
 build/
 dist/
+docs/
 doc/
 gamification_logs/
 .VSCodeCounter/
 stats.dump
 
 *undo-tree*
+.coverage
+.coverage.*
+
+scripts/

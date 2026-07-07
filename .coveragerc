@@ -1,0 +1,19 @@
+[run]
+branch = True
+relative_files = True
+source =
+    simulator
+omit =
+    tests/*.py
+    tests/**/*.py
+    simulator/performance_benchmark.py
+    simulator/compiler/ArduinoLexer.py
+    simulator/compiler/ArduinoParser.py
+    simulator/compiler/ArduinoListener.py
+    simulator/compiler/ArduinoListenerTests.py
+    simulator/compiler/ArduinoVisitor.py
+    simulator/temp/*
+    simulator/temp/**
+
+[report]
+skip_empty = True

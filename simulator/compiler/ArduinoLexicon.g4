@@ -53,19 +53,23 @@ FLOAT_CONST
     ;
 
 CHAR_CONST
-    : UNTERMINATED_CHAR '\''
+    : '\'' (ESCAPE_SEQUENCE | ~[\n'\\]) '\''
     ;
 
 UNTERMINATED_CHAR
-    : '\'' ~[\n'\\]
+    : '\'' (ESCAPE_SEQUENCE | ~[\n'\\])
     ;
 
 STRING_CONST
-    : UNTERMINATED_STRING '"'
+    : '"' (ESCAPE_SEQUENCE | ~["\\\n])* '"'
     ;
 
 UNTERMINATED_STRING
-    : '"' (~["\\\n])*
+    : '"' (ESCAPE_SEQUENCE | ~["\\\n])*
+    ;
+
+fragment ESCAPE_SEQUENCE
+    : '\\' [btnfr"'\\0]
     ;
 
 ID

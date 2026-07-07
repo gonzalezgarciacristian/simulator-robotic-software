@@ -1,0 +1,43 @@
+{
+  "dof": 6,
+  "link_lengths": [0.0, 120.0, 180.0, 120.0, 70.0, 55.0],
+  "joints": [0.0, 70.0, 25.0, 50.0, 0.0, -50.0],
+  "joint_limits": [
+    [-90.0, 90.0],
+    [0.0, 160.0],
+    [-75.0, 75.0],
+    [0.0, 140.0],
+    [-90.0, 90.0],
+    [-80.0, -17.0]
+  ],
+  "joint_types": ["R", "P", "R", "P", "R", "R"],
+  "servo_pins": [11, 10, 9, 6, 5, 3],
+  "servo_calibration": [],
+  "base": {
+    "theta": 0.0,
+    "d": 0.0,
+    "a": 0.0,
+    "alpha": 0.0
+  },
+  "dh_rows": [
+    {"theta": 0.0, "d": 80.0, "a": 0.0, "alpha": 0.0},
+    {"theta": 0.0, "d": 0.0, "a": 120.0, "alpha": 90.0},
+    {"theta": 0.0, "d": 0.0, "a": 180.0, "alpha": 0.0},
+    {"theta": 0.0, "d": 0.0, "a": 120.0, "alpha": 0.0},
+    {"theta": 0.0, "d": 0.0, "a": 70.0, "alpha": 90.0},
+    {"theta": 0.0, "d": 0.0, "a": 55.0, "alpha": 0.0}
+  ],
+  "prismatic_pre_rotations": [
+    {"yaw": 0.0, "pitch": 0.0},
+    {"yaw": 0.0, "pitch": 0.0},
+    {"yaw": 0.0, "pitch": 0.0},
+    {"yaw": 0.0, "pitch": 90.0},
+    {"yaw": 0.0, "pitch": 0.0},
+    {"yaw": 0.0, "pitch": 0.0}
+  ],
+  "visual": {
+    "mode": "auto_generic",
+    "theme": "default",
+    "sizes": {}
+  }
+}

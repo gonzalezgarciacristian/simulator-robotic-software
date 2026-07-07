@@ -77,7 +77,6 @@ class LinearActuatorDrawing(RobotDrawing):
         Arguments:
             vel: the determined velocity
         """
-        vel = vel
         if (not self.hit) and vel != 0:
             if self.but_right.pressed:
                 self.but_right.stop_press()

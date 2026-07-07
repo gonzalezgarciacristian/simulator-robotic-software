@@ -34,7 +34,7 @@ def get_methods():
     methods["reserve"] = ("void", "reserve", [], -1)  # not implemented
     methods["setCharAt"] = ("void", "set_char_at", ["int", "char"], -1)
     methods["startsWith"] = ("bool", "starts_with", ["string"], -1)
-    methods["substring"] = ("string", "substring", ["int", "int"], -1)
+    methods["substring"] = ("string", "substring", ["int", "(int)"], -1)
     methods["toCharArray"] = ("char", "to_char_array", ["char", "int"], 0)
     methods["toDouble"] = ("double", "to_double", [], -1)
     methods["toInt"] = ("int", "to_int", [], -1)
@@ -66,6 +66,9 @@ class String:
     def __repr__(self) -> str:
         return self.string
 
+    def __str__(self) -> str:
+        return self.string
+
     def __add__(self, string):
         if isinstance(string, String):
             return String(self.string + string.string)
@@ -91,10 +94,17 @@ class String:
         return self.string >= string.string
 
     def __eq__(self, string):
-        return self.string == string.string
+        other = string.string if isinstance(string, String) else str(string)
+        return self.string == other
 
     def __ne__(self, string):
-        return self.string != string.string
+        other = string.string if isinstance(string, String) else str(string)
+        return self.string != other
+
+    def __getitem__(self, index):
+        if -len(self.string) <= index < len(self.string):
+            return self.string[index]
+        return '\0'
 
     def char_at(self, n):
         """
@@ -251,9 +261,10 @@ class String:
         Arguments:
             string: a string
         """
-        len_str2 = len(string.string)
+        other = string.string if isinstance(string, String) else str(string)
+        len_str2 = len(other)
         substr = self.string[:len_str2]
-        return substr == string.string
+        return substr == other
 
     def substring(self, from_c, to_c=-1):
         """
@@ -262,7 +273,7 @@ class String:
             from_c: inclusive start index
             to_c: exclusive end index
         """
-        return self.string[from_c: to_c] if to_c != -1 else self.string[from_c:]
+        return String(self.string[from_c: to_c] if to_c != -1 else self.string[from_c:])
 
     def to_char_array(self, buf, len):
         """
@@ -314,3 +325,4 @@ class String:
         Deletes leading and trailing whitespaces from string
         """
         self.string = str(self.string).strip()
+        return self

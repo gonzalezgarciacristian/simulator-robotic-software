@@ -71,6 +71,59 @@ class Servo(Element):
         return "digital"
 
 
+class ArmJointServo(Servo):
+
+    def __init__(self):
+        super().__init__()
+        self.value = 0.0
+        self.command_mode = "position"
+        self.pulse_value = None
+        self.pulse_min = self.min
+        self.pulse_max = self.max
+
+    def set_value(self, pin, value):
+        """
+        Guarda directamente el valor articular del brazo en grados DH/mm.
+        El clamping real se aplica después en el modelo cinemático.
+        """
+        try:
+            Element.set_value(self, pin, float(value))
+            self.command_mode = "velocity"
+            self.pulse_value = None
+            return True
+        except (TypeError, ValueError):
+            return False
+
+    def set_position_value(self, value):
+        """Sincroniza una posicion del modelo sin marcarla como sketch."""
+        try:
+            Element.set_value(self, self.pin, float(value))
+            self.command_mode = "position"
+            self.pulse_value = None
+            return True
+        except (TypeError, ValueError):
+            return False
+
+    def set_pulse_value(self, pin, pulse, pulse_min=None, pulse_max=None, angle=None):
+        """Guarda un pulso PWM real y conserva el angulo equivalente para read()."""
+        try:
+            pulse = float(pulse)
+            pulse_min = float(self.min if pulse_min is None else pulse_min)
+            pulse_max = float(self.max if pulse_max is None else pulse_max)
+            if pulse_max <= pulse_min:
+                return False
+            if angle is None:
+                angle = (pulse - pulse_min) * 180.0 / (pulse_max - pulse_min)
+            Element.set_value(self, pin, float(angle))
+            self.command_mode = "pulse"
+            self.pulse_value = pulse
+            self.pulse_min = pulse_min
+            self.pulse_max = pulse_max
+            return True
+        except (TypeError, ValueError):
+            return False
+
+
 class Button(Element):
 
     def __init__(self):

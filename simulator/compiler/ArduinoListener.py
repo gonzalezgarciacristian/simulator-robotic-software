@@ -1,6 +1,6 @@
-# Generated from Arduino.g4 by ANTLR 4.11.1
+# Generated from Arduino.g4 by ANTLR 4.13.2
 from antlr4 import *
-if __name__ is not None and "." in __name__:
+if "." in __name__:
     from .ArduinoParser import ArduinoParser
 else:
     from ArduinoParser import ArduinoParser
@@ -71,6 +71,24 @@ class ArduinoListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ArduinoParser#pointer_ref.
+    def enterPointer_ref(self, ctx:ArduinoParser.Pointer_refContext):
+        pass
+
+    # Exit a parse tree produced by ArduinoParser#pointer_ref.
+    def exitPointer_ref(self, ctx:ArduinoParser.Pointer_refContext):
+        pass
+
+
+    # Enter a parse tree produced by ArduinoParser#reference_ref.
+    def enterReference_ref(self, ctx:ArduinoParser.Reference_refContext):
+        pass
+
+    # Exit a parse tree produced by ArduinoParser#reference_ref.
+    def exitReference_ref(self, ctx:ArduinoParser.Reference_refContext):
+        pass
+
+
     # Enter a parse tree produced by ArduinoParser#define_macro.
     def enterDefine_macro(self, ctx:ArduinoParser.Define_macroContext):
         pass
@@ -125,6 +143,15 @@ class ArduinoListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by ArduinoParser#function_arg.
+    def enterFunction_arg(self, ctx:ArduinoParser.Function_argContext):
+        pass
+
+    # Exit a parse tree produced by ArduinoParser#function_arg.
+    def exitFunction_arg(self, ctx:ArduinoParser.Function_argContext):
+        pass
+
+
     # Enter a parse tree produced by ArduinoParser#iteration_sentence.
     def enterIteration_sentence(self, ctx:ArduinoParser.Iteration_sentenceContext):
         pass
@@ -167,6 +194,15 @@ class ArduinoListener(ParseTreeListener):
 
     # Exit a parse tree produced by ArduinoParser#sentence.
     def exitSentence(self, ctx:ArduinoParser.SentenceContext):
+        pass
+
+
+    # Enter a parse tree produced by ArduinoParser#scoped_block.
+    def enterScoped_block(self, ctx:ArduinoParser.Scoped_blockContext):
+        pass
+
+    # Exit a parse tree produced by ArduinoParser#scoped_block.
+    def exitScoped_block(self, ctx:ArduinoParser.Scoped_blockContext):
         pass
 
 

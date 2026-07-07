@@ -46,7 +46,6 @@ class ASTNode(metaclass=BaseType):
             return getattr(visitor, f'visit_{name}')(self, param)
         else:
             raise Exception("Warning!")
-            print(f"Warning: {type(self)}.accept called from ASTNode!")
 
     def set_position(self, position):
         self.position = position
@@ -100,6 +99,7 @@ class DeclarationNode(Sentence):
     expr: str = field(default_factory=lambda: None)
     is_const: bool = field(default_factory=lambda: False)
     is_static: bool = field(default_factory=lambda: False)
+    is_reference: bool = field(default_factory=lambda: False)
 
 
 @dataclass
@@ -338,6 +338,11 @@ class CaseNode(Sentence):
 
 
 @dataclass
+class BlockNode(Sentence):
+    sentences: List = None
+
+
+@dataclass
 class ArrayAccessNode(Expression):
     value: IntTypeNode = None
     indexes: List = None
@@ -372,6 +377,13 @@ class BitwiseExpressionNode(BinaryOperation):
 @dataclass
 class CompoundAssignmentNode(BinaryOperation):
     pass
+
+
+@dataclass
+class ConditionalExpressionNode(Expression):
+    condition: Expression = None
+    true_expr: Expression = None
+    false_expr: Expression = None
 
 
 @dataclass
@@ -437,6 +449,11 @@ class StringNode(SingleValue):
 
 @dataclass
 class BooleanNode(SingleValue):
+    pass
+
+
+@dataclass
+class NullPtrNode(SingleValue):
     pass
 
 

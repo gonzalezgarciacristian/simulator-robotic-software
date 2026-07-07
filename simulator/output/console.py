@@ -1,4 +1,5 @@
 import logging
+import threading
 from datetime import datetime
 import os
 from time import time
@@ -75,6 +76,9 @@ class Console:
         self.logger = Logger()
         self.messages = []
         self.input_msgs = []
+        self._pending_output = []
+        self._pending_output_scheduled = False
+        self._pending_output_lock = threading.Lock()
         self.serial_started = False
         self.speed = 0
         self.curr_time = time() * 1000
@@ -150,8 +154,13 @@ class Console:
         Arguments:
             message: the message to add to the list
         """
+        if message is None:
+            message = ""
+        message = str(message)
         self.logger.write_log('info', "Input: {}".format(message))
-        self.input_msgs.append(message)
+        serial_message = message if message.endswith("\n") else message + "\n"
+        self.input_msgs.append(serial_message)
+        self.write_output("> " + message + "\n")
 
     def write_output(self, message):
         """
@@ -161,12 +170,39 @@ class Console:
             message: the message to write
         """
         m_type = 'info'
+        message = str(message)
+        self.logger.write_log(m_type, message)
+        self.messages.append((m_type, message))
+        if threading.current_thread() is threading.main_thread():
+            self.__flush_output()
+            self.__insert_output(message, m_type)
+            return
+        with self._pending_output_lock:
+            self._pending_output.append(message)
+            if self._pending_output_scheduled:
+                return
+            self._pending_output_scheduled = True
+        self.text_widget.after(15, self.__flush_output)
+
+    def __flush_output(self):
+        with self._pending_output_lock:
+            chunks = self._pending_output
+            self._pending_output = []
+            self._pending_output_scheduled = False
+        if not chunks:
+            return
+        message = "".join(chunks)
+        m_type = 'info'
         self.text_widget.config(state=tk.NORMAL)
         self.text_widget.insert(tk.END, message, m_type)
         self.text_widget.see("end")
         self.text_widget.config(state=tk.DISABLED)
-        self.logger.write_log(m_type, message)
-        self.messages.append((m_type, message))
+
+    def __insert_output(self, message, tag='info'):
+        self.text_widget.config(state=tk.NORMAL)
+        self.text_widget.insert(tk.END, message, tag)
+        self.text_widget.see("end")
+        self.text_widget.config(state=tk.DISABLED)
 
     def write_error(self, error_msg: Error):
         """
@@ -174,6 +210,9 @@ class Console:
         Arguments:
             error_msg: the error to write
         """
+        if threading.current_thread() is not threading.main_thread():
+            self.text_widget.after(0, lambda: self.write_error(error_msg))
+            return
         message = error_msg.to_string()
         m_type = 'error'
         self.__insert_text(message, m_type)
@@ -186,6 +225,9 @@ class Console:
         Arguments:
             warning_msg: the error to write
         """
+        if threading.current_thread() is not threading.main_thread():
+            self.text_widget.after(0, lambda: self.write_warning(warning_msg))
+            return
         message = warning_msg.to_string()
         m_type = 'warning'
         self.__insert_text(message, m_type)
@@ -199,6 +241,7 @@ class Console:
             msg_types: the type(s) of the message(s) to be
             displayed
         """
+        self.__flush_output()
         self.text_widget.config(state=tk.NORMAL)
         self.text_widget.delete('1.0', tk.END)
         for m in self.messages:
@@ -212,6 +255,9 @@ class Console:
         self.text_widget.config(state=tk.DISABLED)
         self.messages = []
         self.input_msgs = []
+        with self._pending_output_lock:
+            self._pending_output = []
+            self._pending_output_scheduled = False
 
     def __insert_text(self, message, tag='info'):
         """

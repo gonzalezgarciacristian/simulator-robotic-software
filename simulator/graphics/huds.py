@@ -532,3 +532,95 @@ class ArduinoBoardHUD(HUD):
                                            command=self.put_wire)
         self.button_wire.config(background='#006468', activebackground='#006468')
         self.canvas.create_window(728, 50, window=self.button_wire)
+
+
+class Arm3DHUD(HUD):
+    """
+    HUD para el brazo robótico 3D.
+    Muestra DOF, ángulos articulares, posición XYZ del efector y estado de seguridad.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._last_state = {}
+        self._info_panel = None  # Referencia a Arm3DInfoPanel; si está conectado, se actualiza en update()
+
+    def set_text(self):
+        """Dibuja las etiquetas estáticas del HUD."""
+        if self.canvas is None:
+            return
+        self.canvas.create_text(5, 20, text="Brazo Robótico 3D", font=("Consolas", 13, "bold"),
+                                anchor="w", fill="white", tags="arm3d_static_hud")
+        self.canvas.create_text(5, 45, text="Efector:", font=("Consolas", 12),
+                                anchor="w", fill="white", tags="arm3d_static_hud")
+        self.canvas.create_text(5, 65, text="Articulaciones:", font=("Consolas", 12),
+                                anchor="w", fill="white", tags="arm3d_static_hud")
+        self.canvas.create_text(5, 85, text="Estado:", font=("Consolas", 12),
+                                anchor="w", fill="white", tags="arm3d_static_hud")
+
+    def update(self, dof, joints, end_effector, in_workspace, singular,
+               safety_blocked, warning_message, joint_limits=None, joint_types=None):
+        """
+        Actualiza los valores mostrados en el HUD.
+
+        Args:
+            dof            : número de grados de libertad
+            joints         : lista de ángulos articulares en grados
+            end_effector   : [x, y, z] del efector final en mm
+            in_workspace   : bool
+            singular       : bool
+            safety_blocked : bool
+            warning_message: str con el mensaje de aviso
+            joint_limits   : lista de tuplas (min, max) por articulación
+        """
+        if self.canvas is None:
+            return
+
+        self.canvas.delete("arm3d_dynamic_hud")
+
+        # Efector final
+        if end_effector:
+            ee_text = "X={:.0f}  Y={:.0f}  Z={:.0f} mm".format(*end_effector)
+        else:
+            ee_text = "X=---  Y=---  Z=--- mm"
+        self.canvas.create_text(110, 45, text=ee_text, font=("Consolas", 12),
+                                anchor="w", fill="#00E5CC", tags="arm3d_dynamic_hud")
+
+        # Ángulos/desplazamientos articulares con unidades según tipo
+        if joints:
+            parts = []
+            for i, v in enumerate(joints):
+                unit = "mm" if (joint_types and i < len(joint_types) and joint_types[i] == 'P') else "°"
+                parts.append("J{}={:.0f}{}".format(i + 1, v, unit))
+            joint_text = "  ".join(parts)
+        else:
+            joint_text = ""
+        self.canvas.create_text(110, 65, text=joint_text, font=("Consolas", 11),
+                                anchor="w", fill="white", tags="arm3d_dynamic_hud")
+
+        # Estado de seguridad
+        if safety_blocked:
+            status_text = "⚠ BLOQUEADO"
+            fill_color = "#FF4444"
+        elif singular:
+            status_text = "⚠ Singularidad"
+            fill_color = "#FFA500"
+        elif not in_workspace:
+            status_text = "⚠ Fuera de workspace"
+            fill_color = "#FFA500"
+        else:
+            status_text = "OK"
+            fill_color = "#44FF88"
+
+        self.canvas.create_text(110, 85, text=status_text, font=("Consolas", 12, "bold"),
+                                anchor="w", fill=fill_color, tags="arm3d_dynamic_hud")
+
+        if warning_message:
+            self.canvas.create_text(5, 100, text=warning_message[:90], font=("Consolas", 10),
+                                    anchor="w", fill="#FFA500", tags="arm3d_dynamic_hud")
+
+        # Actualizar también el panel de info lateral si está conectado
+        if self._info_panel is not None:
+            self._info_panel.update(dof, joints, end_effector, in_workspace, singular,
+                                    safety_blocked, warning_message,
+                                    joint_limits=joint_limits, joint_types=joint_types)

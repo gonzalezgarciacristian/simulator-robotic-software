@@ -1,0 +1,6 @@
+antlr4-python3-runtime==4.11.1
+coverage>=7.6,<8
+cryptography>=42,<46
+numpy>=1.26,<3
+Pillow>=10,<12
+pytest>=9,<10

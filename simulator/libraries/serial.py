@@ -6,6 +6,7 @@ into other devices not implemented)
 
 import output.console as console
 import robot_components.boards as boards
+import libraries.string as string_lib
 
 OK = 0
 ERROR = -1
@@ -48,8 +49,8 @@ def get_methods():
     methods["readString"] = ("string", "read_string",
                              [], -1)  # Not implemented
     methods["readStringUntil"] = (
-        "string", "read_string_until", [], -1)  # Not implemented
-    methods["setTimeout"] = ("void", "set_timeout", [], -1)  # Not implemented
+        "string", "read_string_until", ["char"], -1)
+    methods["setTimeout"] = ("void", "set_timeout", ["long"], -1)
     methods["write"] = ("size_t", "write", [], -1)  # Not implemented
     methods["serialEvent"] = ("void", "serial_event",
                               [], -1)  # Not implemented
@@ -70,8 +71,6 @@ def get_not_implemented():
         "readBytes",
         "readBytesUntil",
         "readString",
-        "readStringUntil",
-        "setTimeout",
         "write",
         "serialEvent"
     ]
@@ -172,7 +171,7 @@ def peek():
     return NOT_IMPL_WARNING
 
 
-def print(val):
+def print(val=""):
     """
     Prints a value to the console
     Arguments:
@@ -181,7 +180,7 @@ def print(val):
     cons.write_output(val)
 
 
-def println(val):
+def println(val=""):
     """
     Prints a value to the console and finishes the line
     Arguments:
@@ -221,18 +220,21 @@ def read_string():
     return NOT_IMPL_WARNING
 
 
-def read_string_until():
-    """
-    Not needed (not implemented)
-    """
-    return NOT_IMPL_WARNING
+def read_string_until(terminator):
+    value = []
+    term = str(terminator)
+    if len(term) > 0:
+        term = term[0]
+    while available() > 0:
+        char = read()
+        if char == term:
+            break
+        value.append(char)
+    return string_lib.String("".join(value))
 
 
-def set_timeout():
-    """
-    Not needed (not implemented)
-    """
-    return NOT_IMPL_WARNING
+def set_timeout(_timeout):
+    return OK
 
 
 def write():

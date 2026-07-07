@@ -36,12 +36,13 @@ class Servo:
     ERROR = -1
     NOT_IMPL_WARNING = -2
 
-    def __init__(self, board=None):
+    def __init__(self, board=None, name=None):
         """
         Constructor for Servo class
         """
         self.board = board
         self.servo = None
+        self.instance_name = name
         self.min = 544
         self.max = 2400
         self.speed = 90
@@ -68,8 +69,14 @@ class Servo:
         servo = None
         if self.board is not None:
             servo = self.board.get_pin_element(pin)
+            if servo is None:
+                arm_robot = getattr(self.board, "arm_robot", None)
+                if arm_robot is not None:
+                    servo = arm_robot.attach_servo_to_pin(pin, self.instance_name)
         if servo is not None:
             self.servo = servo
+            self.min = min
+            self.max = max
             servo.min = min
             servo.max = max
             return self.OK
@@ -77,28 +84,63 @@ class Servo:
 
     def write(self, angle):
         """
-        Writes speed to servo.
-        Our Servos, being rotation ones, will have their speed set by this
-        method. If the angle is 0, the speed is full in one direction, if
-        it is 180, is full speed in the oposite direction; with 90 being no
-        movement done by the servo
+        Writes speed/position to servo, replicando Servo::write() de Arduino.
+
+        Arduino trata los valores por debajo de MIN_PULSE_WIDTH (544) como
+        ángulos [0-180] y los mapea al rango de pulso configurado en attach()
+        [min, max]; los valores >= 544 se interpretan directamente como
+        microsegundos. En ambos casos delega en writeMicroseconds(), de modo
+        que write() y writeMicroseconds() comparten el mismo camino (y así
+        write(180) alcanza el extremo físico del servo, como en el hardware).
         Arguments:
             servo: the servo to write to
-            angle: the value to write [0-180]
+            angle: the value to write [0-180] (o microsegundos si es >= 544)
         """
-        self.servo.value = angle
+        if self.servo is not None:
+            try:
+                value = int(float(angle))
+            except (TypeError, ValueError):
+                return
+            if value < 544:
+                value = max(0, min(180, value))
+                value = self.min + value * (self.max - self.min) // 180
+            self.write_microseconds(value)
 
     def write_microseconds(self, us):
         """
-        Writes speed to servo in microseconds.
-        This method will work exactly the same way as write does (because our
-        servos are rotation ones)
+        Writes a pulse width to the servo.
+
+        Arduino Servo clamps writeMicroseconds() to the attached pulse range.
+        Arm joints keep the raw pulse so the 3D model can map it to the
+        configured physical joint range; regular servo elements keep the
+        equivalent 0..180 value used by Servo.read().
         Arguments:
             servo: the servo to write to
             us: the value of the parameter in microseconds (int)
         """
         if self.servo is not None:
-            self.servo.value = us
+            try:
+                pulse = int(float(us))
+            except (TypeError, ValueError):
+                return self.ERROR
+
+            pulse_min = int(getattr(self.servo, "min", self.min))
+            pulse_max = int(getattr(self.servo, "max", self.max))
+            if pulse_max <= pulse_min:
+                return self.ERROR
+
+            clamped = max(pulse_min, min(pulse_max, pulse))
+            angle = (clamped + 1 - pulse_min) * 180 // (pulse_max - pulse_min)
+            angle = max(0, min(180, angle))
+            if hasattr(self.servo, "set_pulse_value"):
+                if not self.servo.set_pulse_value(
+                    self.servo.pin, clamped, pulse_min, pulse_max, angle
+                ):
+                    return self.ERROR
+            elif hasattr(self.servo, "set_value"):
+                self.servo.set_value(self.servo.pin, angle)
+            else:
+                self.servo.value = angle
             return self.OK
         return self.ERROR
 
@@ -133,6 +175,12 @@ class Servo:
             servo: the servo to detach
         """
         if self.servo is not None:
-            self.servo.pin = -1
+            arm_robot = getattr(self.board, "arm_robot", None) if self.board is not None else None
+            if arm_robot is not None:
+                arm_robot.detach_servo(self.servo)
+            elif self.board is not None and self.servo.pin != -1:
+                self.board.detach_pin(self.servo.pin)
+                self.servo.pin = -1
+            self.servo = None
             return self.OK
         return self.ERROR

@@ -416,7 +416,7 @@ class Drawing:
             return self.robots[4]
         if option_gamification == 5:
             return self.robots[5]
-        if option_gamification == 5:
+        if option_gamification == 6:
             return self.robots[6]
 
     def attach(self, component1, pin_component1, component2, pin_component2):

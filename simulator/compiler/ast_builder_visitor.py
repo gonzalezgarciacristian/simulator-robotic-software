@@ -21,6 +21,29 @@ else:
 
 class ASTBuilderVisitor(ArduinoVisitor):
 
+    def visit(self, tree):
+        """Compatibilidad con parsers generados sin métodos `accept()` específicos.
+
+        Parte del código heredado invoca `visitor.visit(tree)` sobre contextos del
+        parser. En este repositorio, el parser generado no expone los `accept()`
+        especializados por regla y, si delegamos en el comportamiento genérico de
+        ANTLR, la visita acaba en `visitChildren()` y el AST raíz puede quedar en
+        `None`.
+
+        Para mantener el contrato esperado por los tests heredados y por el resto
+        del compilador, despachamos explícitamente al método `visit<Rule>` cuando
+        exista para el contexto recibido.
+        """
+        if tree is None:
+            return None
+        ctx_name = type(tree).__name__
+        if ctx_name.endswith("Context"):
+            method_name = "visit" + ctx_name[:-7]
+            visitor = getattr(self, method_name, None)
+            if callable(visitor):
+                return visitor(tree)
+        return super().visit(tree)
+
     # Visit a parse tree produced by ArduinoParser#start.
     def visitStart(self, ctx: ArduinoParser.StartContext):
         return self.visitChildren(ctx)
@@ -74,9 +97,9 @@ class ASTBuilderVisitor(ArduinoVisitor):
         if ctx.a_def is not None:
             node = self.visitArray_declaration(ctx.a_def)
         if ctx.qual is not None:
-            if ctx.qual.text == "const":
+            if node is not None and ctx.qual.text == "const":
                 node.is_const = True
-            if ctx.qual.text == "static":
+            if node is not None and ctx.qual.text == "static":
                 node.is_static = True
         self.__add_line_info(node, ctx)
         return node
@@ -84,13 +107,17 @@ class ASTBuilderVisitor(ArduinoVisitor):
     # Visit a parse tree produced by ArduinoParser#simple_declaration.
     def visitSimple_declaration(self, ctx: ArduinoParser.Simple_declarationContext):
         v_type = var_name = expr = None
-        if ctx.v_type is not None:
+        if ctx.ptr_type is not None:
+            v_type = StringTypeNode()
+        elif ctx.v_type is not None:
             v_type = self.visitVar_type(ctx.v_type)
-        if ctx.ID() is not None:
-            var_name = ctx.ID().getText()
+        if ctx.var_name is not None:
+            var_name = ctx.var_name.text
         if ctx.val is not None:
             expr = self.visitExpression(ctx.val)
         node = DeclarationNode(type=v_type, var_name=var_name, expr=expr)
+        if ctx.ptr_type is not None:
+            node.is_reference = True
         self.__add_line_info(node, ctx)
         return node
 
@@ -101,8 +128,8 @@ class ASTBuilderVisitor(ArduinoVisitor):
         is_constant = False
         if ctx.v_type is not None:
             v_type = self.visitVar_type(ctx.v_type)
-        if ctx.ID() is not None:
-            var_name = ctx.ID().getText()
+        if ctx.var_name is not None:
+            var_name = ctx.var_name.text
         if ctx.elems is not None:
             elements = self.visitArray_elements(ctx.elems)
         if ctx.a_index is not None:
@@ -199,10 +226,12 @@ class ASTBuilderVisitor(ArduinoVisitor):
         v_type = f_name = None
         args = []
         sentences = []
-        if ctx.v_type is not None:
+        if ctx.ptr_type is not None:
+            v_type = StringTypeNode()
+        elif ctx.v_type is not None:
             v_type = self.visitVar_type(ctx.v_type)
-        if ctx.ID() is not None:
-            f_name = ctx.ID().getText()
+        if ctx.f_name is not None:
+            f_name = ctx.f_name.text
         if ctx.f_args is not None:
             args = self.visitFunction_args(ctx.f_args)
         if ctx.sentences is not None:
@@ -217,8 +246,31 @@ class ASTBuilderVisitor(ArduinoVisitor):
         args = []
         if ctx.f_args is not None:
             for arg in ctx.f_args:
-                args.append(self.visitDeclaration(arg))
+                args.append(self.visitFunction_arg(arg))
         return args
+
+    def visitFunction_arg(self, ctx: ArduinoParser.Function_argContext):
+        v_type = var_name = expr = None
+        if ctx.ptr_type is not None:
+            v_type = StringTypeNode()
+        elif ctx.v_type is not None:
+            v_type = self.visitVar_type(ctx.v_type)
+        if ctx.var_name is not None:
+            var_name = ctx.var_name.text
+        if ctx.val is not None:
+            expr = self.visitExpression(ctx.val)
+        node = DeclarationNode(type=v_type, var_name=var_name, expr=expr)
+        if ctx.reference_ref() is not None and not getattr(node, "is_const", False):
+            node.is_reference = True
+        if ctx.qual is not None:
+            if ctx.qual.text == "const":
+                node.is_const = True
+            if ctx.qual.text == "static":
+                node.is_static = True
+            if ctx.qual.text == "const":
+                node.is_reference = False
+        self.__add_line_info(node, ctx)
+        return node
 
     # Visit a parse tree produced by ArduinoParser#iteration_sentence.
     def visitIteration_sentence(self, ctx: ArduinoParser.Iteration_sentenceContext):
@@ -296,6 +348,8 @@ class ASTBuilderVisitor(ArduinoVisitor):
             node = self.visitIteration_sentence(ctx.it_sent)
         if ctx.cond_sent is not None:
             node = self.visitConditional_sentence(ctx.cond_sent)
+        if ctx.scope_block is not None:
+            node = self.visitScoped_block(ctx.scope_block)
         if ctx.assign is not None:
             node = self.visitAssignment(ctx.assign)
         if ctx.expr is not None:
@@ -312,6 +366,15 @@ class ASTBuilderVisitor(ArduinoVisitor):
                 node = BreakNode()
             if ctx.s_type.text == "continue":
                 node = ContinueNode()
+        self.__add_line_info(node, ctx)
+        return node
+
+    def visitScoped_block(self, ctx: ArduinoParser.Scoped_blockContext):
+        sents = []
+        if ctx.sentences is not None:
+            for sent in ctx.sentences:
+                sents.append(self.visitSentence(sent))
+        node = BlockNode(sents)
         self.__add_line_info(node, ctx)
         return node
 
@@ -356,6 +419,11 @@ class ASTBuilderVisitor(ArduinoVisitor):
             node = FunctionCallNode(name, args)
         if ctx.conv is not None:
             node = self.visitConversion(ctx.conv)
+        if ctx.cond is not None:
+            condition = self.visitExpression(ctx.cond)
+            true_expr = self.visitExpression(ctx.true_expr)
+            false_expr = self.visitExpression(ctx.false_expr)
+            node = ConditionalExpressionNode(condition, true_expr, false_expr)
         if ctx.operator is not None:
             left = right = expr = None
             op = ctx.operator
@@ -370,7 +438,13 @@ class ASTBuilderVisitor(ArduinoVisitor):
                 if operator == '++' or operator == '--':
                     node = IncDecExpressionNode(expr, operator)
                 if operator in arit_ops:
-                    node = ArithmeticExpressionNode(left, operator, right)
+                    if left is None:
+                        if operator == '+':
+                            node = expr
+                        else:
+                            node = ArithmeticExpressionNode(IntNode(0), operator, expr)
+                    else:
+                        node = ArithmeticExpressionNode(left, operator, right)
                 if operator in bitwise_ops:
                     node = BitwiseExpressionNode(left, operator, right)
                 if operator in bool_ops:
@@ -383,6 +457,10 @@ class ASTBuilderVisitor(ArduinoVisitor):
                     node = NotExpressionNode(expr)
                 if operator == '~':
                     node = BitNotExpressionNode(expr)
+                if operator == '*' and left is None:
+                    node = expr
+                if operator == '&' and left is None:
+                    node = expr
         if ctx.getText() == "true":
             node = BooleanNode(True)
         elif ctx.getText() == "false":
@@ -417,6 +495,8 @@ class ASTBuilderVisitor(ArduinoVisitor):
             string_const = ctx.STRING_CONST().getText()
             string_const = string_const.replace('"', '')
             node = StringNode(string_const)
+        if ctx.getText() == "nullptr":
+            node = NullPtrNode(None)
         if ctx.ID() is not None and ctx.array_name is None and ctx.id_acc is None:
             node = IDNode(ctx.ID().getText())
         self.__add_line_info(node, ctx)

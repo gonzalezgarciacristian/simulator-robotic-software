@@ -1,5 +1,7 @@
 import unittest
 
+from path_helper import tests_path
+
 from antlr4 import *
 from compiler.ArduinoLexer import ArduinoLexer
 from compiler.ArduinoParser import ArduinoParser
@@ -40,7 +42,7 @@ class TestBase(unittest.TestCase):
         tree = parser.program()
         errors.extend(listener.errors)
         if len(errors) < 1:
-            ast = visitor.visit(tree)
+            ast = visitor.visitProgram(tree)
             sem_analysis.execute(ast)
             try:
                 errors.extend(sem_analysis.errors)
@@ -57,7 +59,7 @@ class TestBase(unittest.TestCase):
 
 
 class TestWarnings(TestBase):
-    file = "tests/warning-tests/test.txt"
+    file = tests_path("warning-tests", "test.txt")
 
     def test_n_errors(self):
         self.assertEqual(6, len(self.warns))

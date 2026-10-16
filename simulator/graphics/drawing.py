@@ -86,7 +86,7 @@ class Drawing:
         Deletes all the elements that have to be zoomed
         """
         self.canvas.delete('actuator', 'button_left', 'button_right', 'block', 'arduinoBoard')
-        self.canvas.delete('robot', 'circuit', 'obstacle', 'wire',
+        self.canvas.delete('robot', 'circuit', 'obstacle', 'wire', 'trail',
                            'light_1', 'light_2', 'light_3', 'light_4')
         self.canvas.delete('prueba')
         for component in self.components:
@@ -416,7 +416,7 @@ class Drawing:
             return self.robots[4]
         if option_gamification == 5:
             return self.robots[5]
-        if option_gamification == 5:
+        if option_gamification == 6:
             return self.robots[6]
 
     def attach(self, component1, pin_component1, component2, pin_component2):

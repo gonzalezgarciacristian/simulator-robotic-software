@@ -1,4 +1,7 @@
 import unittest
+
+from path_helper import codes_path
+
 import robot_components.robots as r
 import robot_components.elements as e
 import robot_components.boards as b
@@ -8,7 +11,7 @@ import graphics.drawing as d
 class TestsChallenges(unittest.TestCase):
 
     def get_correct_code(self):
-        url = "C:\\Users\\masuh\\OneDrive\\Escritorio\\TFG\\Desarrollo\\simulator-robotic-software\\codes/challenge6"
+        url = codes_path("challenge6")
         code_file = open(url, "r")
         code = code_file.read()
         code_file.close()
@@ -23,7 +26,7 @@ class TestsChallenges(unittest.TestCase):
     def test_correct(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (CORRECTO)
@@ -65,7 +68,7 @@ class TestsChallenges(unittest.TestCase):
     def test_incorrect_code(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (CORRECTO)
@@ -107,7 +110,7 @@ class TestsChallenges(unittest.TestCase):
     def test_incorrect_circuit_less_elements(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (INCORRECTO)
@@ -139,7 +142,7 @@ class TestsChallenges(unittest.TestCase):
     def test_incorrect_circuit_less_connections(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (INCORRECTO)
@@ -177,7 +180,7 @@ class TestsChallenges(unittest.TestCase):
     def test_incorrect_circuit_wrong_elements(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (INCORRECTO)
@@ -219,7 +222,7 @@ class TestsChallenges(unittest.TestCase):
     def test_incorrect_circuit_wrong_connections(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (INCORRECTO)
@@ -261,7 +264,7 @@ class TestsChallenges(unittest.TestCase):
     def test_incorrect_circuit_code(self):
         drawing = d.Drawing()
         # Obtenemos el robot correcto
-        correct_robot = drawing.get_robot_challenge(5)
+        correct_robot = drawing.get_robot_challenge(6)
         # Obtenermos el código correcto
         correct_code = self.get_correct_code()
         # Configuramos el robot (INCORRECTO)

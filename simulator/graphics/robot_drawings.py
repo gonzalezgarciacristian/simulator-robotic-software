@@ -99,6 +99,24 @@ class LinearActuatorDrawing(RobotDrawing):
             self.block.x += vel
             self.drawing.move_image("block", self.block.x, self.block.y)
 
+    def set_buttons(self, left_pressed, right_pressed):
+        """
+        Fija el estado de los pulsadores (final de carrera) y los redibuja.
+        Usado por el gemelo digital para reflejar el estado físico real.
+        Arguments:
+            left_pressed: True si el pulsador izquierdo (sensor) está pulsado
+            right_pressed: True si el pulsador derecho (motor) está pulsado
+        """
+        if left_pressed:
+            self.but_left.press()
+        else:
+            self.but_left.stop_press()
+        if right_pressed:
+            self.but_right.press()
+        else:
+            self.but_right.stop_press()
+        self.__redraw_buttons()
+
     def __redraw_buttons(self):
         """
         Redraws the buttons when they are changed
@@ -218,7 +236,9 @@ class LinearActuatorDrawing(RobotDrawing):
 
 class MobileRobotDrawing(RobotDrawing):
 
-    def __init__(self, drawing: drawing.Drawing, n_light_sens):
+    def __init__(self, drawing: drawing.Drawing, n_light_sens,
+                 drawing_width=6300, drawing_height=4300,
+                 start_x=500, start_y=500):
         """
         Constructor for mobile robot
         Arguments:
@@ -226,14 +246,20 @@ class MobileRobotDrawing(RobotDrawing):
             to be represented
             n_light_sens: the number of light sensors of the
             robot
+            drawing_width: width of the world (canvas) the robot
+            moves on. Enlarged for the infinite circuit
+            drawing_height: height of the world (canvas)
+            start_x: initial x position of the robot (centred on
+            the world for the infinite circuit)
+            start_y: initial y position of the robot
         """
         super().__init__(drawing)
         self.img_mobrob = "assets/mobile-robot.png"
 
-        self.drawing_width = 6300
-        self.drawing_height = 4300
-        self.x = 500
-        self.y = 500
+        self.drawing_width = drawing_width
+        self.drawing_height = drawing_height
+        self.x = start_x
+        self.y = start_y
         self.real_x = self.x
         self.real_y = self.y
         self.width = 516
@@ -1203,3 +1229,80 @@ class Obstacle:
             self.x <= x <= (self.x + self.width)
             and self.y <= y <= (self.y + self.height)
         )
+
+
+class Trail:
+    """
+    The path the robot leaves behind itself on the infinite circuit.
+
+    It is drawn to look like the road of the regular circuits: a black band of
+    the same width (``ROAD_WIDTH``) sitting underneath the robot. It stores the
+    visited world positions (un-scaled coordinates) so the whole trail can be
+    redrawn at the current scale after a zoom, exactly like the wires do.
+    """
+
+    # Same road width the circuits use (Circuit.ROAD_WIDTH), so the trail
+    # matches the look of the other tracks.
+    ROAD_WIDTH = 100
+
+    def __init__(self, drawing: drawing.Drawing, color="black", width=ROAD_WIDTH):
+        """
+        Arguments:
+            drawing: the drawing where the trail is represented
+            color: the colour of the trail (black, like the road)
+            width: the trail width in world units (scaled when drawn)
+        """
+        self.drawing = drawing
+        self.color = color
+        self.width = width
+        self.points = []  # world coordinates (x, y)
+
+    def reset(self):
+        """
+        Clears the stored path (used when a new run starts).
+        """
+        self.points = []
+
+    def add_point(self, x, y):
+        """
+        Adds a new world position and draws the segment from the previous
+        one. Repeated positions (no real movement) are ignored.
+        Arguments:
+            x: the world x coordinate of the robot
+            y: the world y coordinate of the robot
+        """
+        if self.points:
+            x0, y0 = self.points[-1]
+            if int(x0) == int(x) and int(y0) == int(y):
+                return
+            self.__draw_segment(x0, y0, x, y)
+        self.points.append((x, y))
+
+    def draw(self):
+        """
+        Redraws the whole trail at the current scale (e.g. after a zoom).
+        """
+        for i in range(1, len(self.points)):
+            x0, y0 = self.points[i - 1]
+            x1, y1 = self.points[i]
+            self.__draw_segment(x0, y0, x1, y1)
+
+    def __draw_segment(self, x1, y1, x2, y2):
+        """
+        Draws a single road segment scaling the world coordinates to canvas
+        coordinates (same convention as Drawing.draw_rectangle). Round caps
+        and joins make consecutive segments blend into a continuous band, and
+        the segment is pushed to the bottom so the robot stays on top.
+        """
+        canvas = self.drawing.canvas
+        if canvas is None:
+            return
+        scale = self.drawing.scale
+        line_id = canvas.create_line(
+            x1 * scale, y1 * scale + self.drawing.hud_h,
+            x2 * scale, y2 * scale + self.drawing.hud_h,
+            tags="trail", fill=self.color,
+            width=max(1, int(self.width * scale)),
+            capstyle="round", joinstyle="round")
+        # Keep the road underneath the robot and the sensors
+        canvas.tag_lower(line_id)

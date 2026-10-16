@@ -122,6 +122,10 @@ class Layer:
 
 class MobileRobotLayer(Layer):
 
+    # Side of the (square) world used by the infinite circuit. Big enough to
+    # feel limitless during a session; the camera keeps the robot centred.
+    INFINITE_SIZE = 200000
+
     def __init__(self, n_light_sens):
         """
         Constructor for MobileRobotLayer
@@ -141,6 +145,19 @@ class MobileRobotLayer(Layer):
         self.is_moving = False
         self.circuit = None
         self.obstacle = None
+        # Última intención de movimiento (px/tick de avance y grados/tick de giro). La lee
+        # el controller para conducir el coche físico en vivo (jog) bajo control del gemelo.
+        self.last_v = 0
+        self.last_da = 0
+        # Bajo control del gemelo (lazo cerrado), la pose la fija el coche físico vía
+        # mensajes "5,<der>,<izq>"; el desplazamiento local del teclado se suprime.
+        self.twin_external = False
+        # Infinite circuit: free unbounded plane with a trail behind the robot
+        self.infinite = False
+        self.trail = None
+        # Last camera scroll offset (canvas px); None = not positioned yet
+        self._cam_x = None
+        self._cam_y = None
 
     def move(self, using_keys, move_WASD):
         """
@@ -153,14 +170,28 @@ class MobileRobotLayer(Layer):
         else:
             v, da = self.__move_code()
 
+        # Se conserva la intención (la lee el controller para el jog del gemelo) aunque
+        # bajo control externo no se mueva el robot en local.
+        self.last_v = v
+        self.last_da = da
+        if self.twin_external:
+            # Bajo control del gemelo la pose la dicta el coche físico (feedback
+            # "5,<der>,<izq>", aplicado por el traductor); se suprime el movimiento local.
+            return
+
         future_p = self.robot_drawing.predict_movement(v)
-        if (
-                v == 0
-                or future_p[0] <= self.robot_drawing.width / 2
+        hit_border = (
+                future_p[0] <= self.robot_drawing.width / 2
                 or future_p[0] >= self.robot_drawing.drawing_width - self.robot_drawing.width / 2
                 or future_p[1] <= self.robot_drawing.height / 2
                 or future_p[1] >= self.robot_drawing.drawing_height - self.robot_drawing.height / 2
-                or self.__check_obstacle_collision(future_p[0], future_p[1])
+        )
+        # On the infinite circuit there are no borders nor obstacles to block
+        if (
+                v == 0
+                or (not self.infinite
+                    and (hit_border
+                         or self.__check_obstacle_collision(future_p[0], future_p[1])))
         ):
             v = 0
             self.is_moving = False
@@ -177,6 +208,81 @@ class MobileRobotLayer(Layer):
         if self.obstacle is not None:
             self.__detect_obstacle()
 
+        # Infinite circuit: extend the trail and keep the camera on the robot
+        if self.infinite and self.trail is not None:
+            self.trail.add_point(self.robot_drawing.x, self.robot_drawing.y)
+            self.__follow_camera()
+
+    # ------------------------------------------------- Gemelo digital (reflejo)
+    def apply_twin_move(self, v, da):
+        """Aplica al dibujo un avance ``v`` (px) y/o giro ``da`` (grados) reflejados del
+        coche físico, RESPETANDO los bordes del mundo y los obstáculos igual que el control
+        local: si el avance chocaría, se anula (el coche del sim no atraviesa la pared ni el
+        obstáculo, aunque el coche real siga). Lo llama ``CarTranslator.apply_to_sim``.
+        """
+        if v != 0:
+            future_p = self.robot_drawing.predict_movement(v)
+            hit_border = (
+                    future_p[0] <= self.robot_drawing.width / 2
+                    or future_p[0] >= self.robot_drawing.drawing_width - self.robot_drawing.width / 2
+                    or future_p[1] <= self.robot_drawing.height / 2
+                    or future_p[1] >= self.robot_drawing.drawing_height - self.robot_drawing.height / 2
+            )
+            # En el circuito infinito no hay bordes ni obstáculos que bloqueen.
+            if not self.infinite and (
+                    hit_border
+                    or self.__check_obstacle_collision(future_p[0], future_p[1])):
+                v = 0
+            self.robot_drawing.move(v)
+        if da != 0:
+            self.robot_drawing.change_angle(da)
+        self.__hud_velocity()
+
+        if self.circuit is not None:
+            self.__check_circuit_overlap()
+        if self.obstacle is not None:
+            self.__detect_obstacle()
+        if self.infinite and self.trail is not None:
+            self.trail.add_point(self.robot_drawing.x, self.robot_drawing.y)
+            self.__follow_camera()
+
+    def apply_twin_sensors(self, ir_values, dist_cm):
+        """Refleja en el canvas los sensores REALES del coche físico (modo pasivo del gemelo).
+
+        Lo llama ``CarTranslator.apply_to_sim`` al recibir la trama ``7,...``. Reusa los mismos
+        efectos que la detección virtual (``__check_circuit_overlap`` / ``__detect_obstacle``)
+        pero con los valores del robot físico en vez de los del circuito simulado.
+
+        Arguments:
+            ir_values: secuencia de 0/1 de los IR en orden físico izquierda->derecha
+                (1 = oscuro / sobre la línea). Se mapea posicionalmente a los sensores de luz
+                del dibujo; si el robot del sim tiene menos sensores, sobran los últimos IR.
+            dist_cm: distancia del ultrasonido en cm, o None si no hay eco.
+        """
+        light_sensors = self.robot_drawing.sensors["light"]
+        measurements = []
+        values = []
+        for sens, raw in zip(light_sensors, ir_values):
+            if raw:
+                sens.dark()
+                measurements.append(True)
+                values.append(1)
+            else:
+                sens.light()
+                measurements.append(False)
+                values.append(0)
+        if measurements:
+            self.robot.set_light_sens_value(values)
+            self.robot_drawing.repaint_light_sensors()
+            self.hud.set_circuit(measurements)
+
+        detecting = dist_cm is not None and dist_cm >= 0
+        self.robot_drawing.sensors["sound"].set_detect(detecting)
+        self.robot.sound.value = 1 if detecting else 0
+        self.robot.sound.dist = dist_cm if detecting else -1
+        self.hud.set_detect_obstacle([dist_cm if detecting else -1], unit="cm")
+    # ----------------------------------------------- Fin Gemelo digital (reflejo)
+
     def set_circuit(self, circuit_opt):
         """
         Changes the circuit
@@ -184,6 +290,11 @@ class MobileRobotLayer(Layer):
             circuit_opt: the number of the chosen circuit
         """
         circuit_name = self.__parse_circuit_opt(circuit_opt)
+        if circuit_name == "infinite":
+            self.__set_infinite_circuit()
+            return
+        self.infinite = False
+        self.trail = None
         map_tuple = self.rdr.parse_circuit(circuit_name)
         straights = map_tuple[0]
         obstacles = map_tuple[1]
@@ -193,14 +304,35 @@ class MobileRobotLayer(Layer):
             self.obstacle = robot_drawings.Obstacle(obstacles[0], self.drawing)
         self.reset_robot()
 
-    def reset_robot(self):
+    def __set_infinite_circuit(self):
+        """
+        Configures the infinite circuit: an unbounded empty plane where the
+        robot is driven freely, the camera follows it and it leaves a trail.
+        """
+        self.infinite = True
+        self.circuit = None
+        self.obstacle = None
+        self._cam_x = None
+        self._cam_y = None
+        self.reset_robot(infinite=True)
+        self.trail = robot_drawings.Trail(self.drawing)
+
+    def reset_robot(self, infinite=False):
         """
         Resets the robot
+        Arguments:
+            infinite: if True, builds the robot on the enlarged world and
+            centred, for the infinite circuit
         """
         self.hud = huds.MobileHUD()
         self.robot = robots.MobileRobot(self.n_sens, self.robot_data)
-        self.robot_drawing = robot_drawings.MobileRobotDrawing(
-            self.drawing, self.n_sens)
+        if infinite:
+            size = self.INFINITE_SIZE
+            self.robot_drawing = robot_drawings.MobileRobotDrawing(
+                self.drawing, self.n_sens, size, size, size // 2, size // 2)
+        else:
+            self.robot_drawing = robot_drawings.MobileRobotDrawing(
+                self.drawing, self.n_sens)
 
     def __move_keys(self, movement):
         """
@@ -285,6 +417,8 @@ class MobileRobotLayer(Layer):
             return "straight and obstacle"
         elif circuit_opt == 5:
             return "node circuit"
+        elif circuit_opt == 6:
+            return "infinite"
         return "circuit"
 
     def _drawing_config(self):
@@ -293,6 +427,8 @@ class MobileRobotLayer(Layer):
         updating
         """
         super()._drawing_config()
+        if self.infinite and self.trail is not None:
+            self.trail.reset()  # start each run with a clean trail
         self.__create_circuit()
         self.__create_obstacle()
 
@@ -302,6 +438,40 @@ class MobileRobotLayer(Layer):
         """
         self.__create_circuit()
         self.__create_obstacle()
+        if self.infinite and self.trail is not None:
+            self.trail.draw()
+
+    def __follow_camera(self):
+        """
+        Scrolls the canvas so the robot stays centred in the viewport,
+        giving the infinite plane its "camera follows the car" feel.
+
+        The target scroll is quantised to whole canvas pixels and only applied
+        when it actually changes; otherwise the per-frame sub-pixel rounding of
+        xview_moveto fights the robot position and makes the car vibrate.
+        """
+        canvas = self.drawing.canvas
+        if canvas is None:
+            return
+        scale = self.drawing.scale
+        total_w = self.robot_drawing.drawing_width * scale
+        total_h = self.robot_drawing.drawing_height * scale
+        view_w = canvas.winfo_width()
+        view_h = canvas.winfo_height()
+        # Robot pixel on the canvas, computed exactly like Drawing.move_image
+        # (int(coord * scale)). Driving the camera from the same integer keeps
+        # the robot's screen position constant (no sub-pixel wobble).
+        robot_px = int(self.robot_drawing.x * scale)
+        robot_py = int(self.robot_drawing.y * scale)
+        cam_x = min(max(robot_px - view_w // 2, 0), int(max(total_w - view_w, 0)))
+        cam_y = min(max(robot_py - view_h // 2, 0), int(max(total_h - view_h, 0)))
+        # +0.5 px bias so tkinter's fraction->pixel truncation lands on cam_*
+        if total_w > 0 and cam_x != self._cam_x:
+            self._cam_x = cam_x
+            canvas.xview_moveto((cam_x + 0.5) / total_w)
+        if total_h > 0 and cam_y != self._cam_y:
+            self._cam_y = cam_y
+            canvas.yview_moveto((cam_y + 0.5) / total_h)
 
     def __create_circuit(self):
         """
@@ -395,6 +565,10 @@ class LinearActuatorLayer(Layer):
         self.robot_data = self.rdr.parse_robot(3)
         self.robot = robots.LinearActuator(self.robot_data)
         self.robot_drawing = robot_drawings.LinearActuatorDrawing(self.drawing)
+        self.last_v = 0  # última velocidad del bloque (px/tick), la lee el controller
+        # Bajo control del gemelo (lazo cerrado), la posición del bloque la fija ALF
+        # vía mensajes "5,<pos>"; el desplazamiento local del teclado se suprime.
+        self.twin_external = False
 
     def move(self, using_keys, move_WASD):
         """
@@ -403,11 +577,27 @@ class LinearActuatorLayer(Layer):
         """
         v = 0
         self.robot_drawing.hit = False
-        if using_keys:
-            v = self.__move_keys(move_WASD)
+        if self.twin_external:
+            # Bajo control del gemelo, la dirección (teclado o código) sale SOLO de la
+            # intención, sin toparse con los bordes simulados (508/1912): el límite real
+            # lo decide ALF (final de carrera físico). Si se gateara con 'block.x' (que
+            # aquí lo fija el feedback de ALF), al llegar el bloque al borde se frenaría
+            # a ALF antes de tocar el tope físico.
+            if using_keys:
+                v = self.__key_direction(move_WASD)
+            else:
+                v = self.__code_direction()
         else:
-            v = self.__move_code()
-        self.robot_drawing.move(v)
+            if using_keys:
+                v = self.__move_keys(move_WASD)
+            else:
+                v = self.__move_code()
+        # Última velocidad del bloque (px/tick). La lee el controller para conducir
+        # el actuador físico en vivo (jog) cuando el gemelo tiene el control.
+        self.last_v = v
+        # Bajo control del gemelo, el bloque no se desplaza en local: su posición la
+        # fija ALF (lazo cerrado). Se conserva 'v' solo como dirección para el jog.
+        self.robot_drawing.move(0 if self.twin_external else v)
         self.hud.set_direction(v * 25)
         self.hud.set_pressed(
             [self.robot_drawing.but_left.pressed, self.robot_drawing.but_right.pressed])
@@ -430,6 +620,33 @@ class LinearActuatorLayer(Layer):
             self.__hit_right(v == 0)
         return v
 
+    def __key_direction(self, movement):
+        """
+        Devuelve solo la dirección de las teclas (sin tope por bordes ni gestión de
+        pulsadores), para conducir el jog del actuador físico bajo control del gemelo.
+        Arguments:
+            movement: estado de las teclas WASD
+        """
+        if movement["a"] or movement["A"]:
+            return -15
+        if movement["d"] or movement["D"]:
+            return 15
+        return 0
+
+    def __code_direction(self):
+        """
+        Devuelve solo la dirección que pide el código (servo), sin tope por bordes ni
+        gestión de pulsadores, para conducir el jog del actuador físico bajo control del
+        gemelo cuando se ejecuta código en el simulador.
+        Convención de __move_code: servo.value < 90 -> hacia el motor (derecha, +);
+        > 90 -> hacia el sensor (izquierda, -); == 90 -> parado.
+        """
+        if self.robot.servo.value < 90:
+            return 15
+        if self.robot.servo.value > 90:
+            return -15
+        return 0
+
     def __move_code(self):
         """
         Moves the robot using the programmed instructions
@@ -450,6 +667,24 @@ class LinearActuatorLayer(Layer):
             self.__hit_left(False)
             self.__hit_right(False)
         return v
+
+    # ------------------------------------------------- Gemelo digital (reflejo)
+    def set_physical_limits(self, motor_pressed, sensor_pressed):
+        """
+        Refleja el estado real de los finales de carrera del actuador físico en la
+        interfaz (lazo cerrado del gemelo). Motor = pulsador derecho, sensor = izquierdo.
+        Actualiza el dibujo, el modelo (button_left/right.value) y el HUD.
+        Arguments:
+            motor_pressed: True si el final de carrera del motor está pulsado
+            sensor_pressed: True si el final de carrera del sensor está pulsado
+        """
+        self.robot_drawing.set_buttons(
+            left_pressed=sensor_pressed, right_pressed=motor_pressed)
+        self.robot.button_left.value = 0 if sensor_pressed else 1
+        self.robot.button_right.value = 0 if motor_pressed else 1
+        self.hud.set_pressed(
+            [self.robot_drawing.but_left.pressed, self.robot_drawing.but_right.pressed])
+    # ----------------------------------------------- Fin Gemelo digital (reflejo)
 
     def __hit_left(self, has_hit):
         """

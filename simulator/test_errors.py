@@ -1,4 +1,7 @@
 import unittest
+
+from path_helper import tests_path
+
 from antlr4 import *
 from compiler.ArduinoLexer import ArduinoLexer
 from compiler.ArduinoParser import ArduinoParser
@@ -27,7 +30,7 @@ class TestBaseErrors(unittest.TestCase):
         tree = parser.program()
         self.syntax_errors = error_listener.errors
         if len(self.syntax_errors) < 1:
-            self.ast = visitor.visit(tree)
+            self.ast = visitor.visitProgram(tree)
             semantic.execute(self.ast)
         try:
             self.semantic_errors = semantic.errors
@@ -43,7 +46,7 @@ class TestBaseErrors(unittest.TestCase):
 
 
 class TestSyntaxErrors(TestBaseErrors):
-    file = "tests/error-tests/lex-syn.txt"
+    file = tests_path("error-tests", "lex-syn.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.syntax_errors), 5)
@@ -69,7 +72,7 @@ class TestSyntaxErrors(TestBaseErrors):
 
 
 class TestSetupLoopErrors(TestBaseErrors):
-    file = "tests/error-tests/setup-loop.txt"
+    file = tests_path("error-tests", "setup-loop.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 2)
@@ -86,7 +89,7 @@ class TestSetupLoopErrors(TestBaseErrors):
 
 
 class TestTypeErrors(TestBaseErrors):
-    file = "tests/error-tests/types.txt"
+    file = tests_path("error-tests", "types.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 30)
@@ -163,7 +166,7 @@ class TestTypeErrors(TestBaseErrors):
 
 
 class TestDeclarationErrors(TestBaseErrors):
-    file = "tests/error-tests/declarations.txt"
+    file = tests_path("error-tests", "declarations.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 12)
@@ -200,7 +203,7 @@ class TestDeclarationErrors(TestBaseErrors):
 
 
 class TestFlowErrors(TestBaseErrors):
-    file = "tests/error-tests/flow.txt"
+    file = tests_path("error-tests", "flow.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 8)
@@ -229,7 +232,7 @@ class TestFlowErrors(TestBaseErrors):
 
 
 class TestArrayAccessErrors(TestBaseErrors):
-    file = "tests/error-tests/arrays.txt"
+    file = tests_path("error-tests", "arrays.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 24)
@@ -312,7 +315,7 @@ class TestArrayAccessErrors(TestBaseErrors):
 
 
 class TestLibraryFunctionErrors(TestBaseErrors):
-    file = "tests/error-tests/library-function.txt"
+    file = tests_path("error-tests", "library-function.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 5)
@@ -338,23 +341,23 @@ class TestLibraryFunctionErrors(TestBaseErrors):
 
 
 class TestPositiveCases(TestBaseErrors):
-    file = "tests/error-tests/mobile-ok.txt"
+    file = tests_path("error-tests", "mobile-ok.txt")
 
     def test_number_of_errors(self):
         self.assertEqual(len(self.semantic_errors), 0)
 
-        self.file = "tests/error-tests/labyrinth-ok.txt"
+        self.file = tests_path("error-tests", "labyrinth-ok.txt")
         self.setUp()
         self.assertEqual(len(self.semantic_errors), 0)
 
-        self.file = "tests/error-tests/pruebas-ok.txt"
+        self.file = tests_path("error-tests", "pruebas-ok.txt")
         self.setUp()
         self.assertEqual(len(self.semantic_errors), 0)
 
-        self.file = "tests/error-tests/blinking-ok.txt"
+        self.file = tests_path("error-tests", "blinking-ok.txt")
         self.setUp()
         self.assertEqual(len(self.semantic_errors), 0)
 
-        self.file = "tests/error-tests/mixed-ok.txt"
+        self.file = tests_path("error-tests", "mixed-ok.txt")
         self.setUp()
         self.assertEqual(len(self.semantic_errors), 0)

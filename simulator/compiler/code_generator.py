@@ -428,7 +428,7 @@ class CodeGenerator(ast_visitor.ASTVisitor):
         self.write_to_script(")")
         return None
 
-    def visit_compound_assigment(self, compound_asigment: ast.CompoundAssignmentNode, param):
+    def visit_compound_assignment(self, compound_asigment: ast.CompoundAssignmentNode, param):
         if compound_asigment.left is not None:
             compound_asigment.left.accept(self, param)
         self.write_to_script(" {} ".format(compound_asigment.op))

@@ -2,7 +2,6 @@ import libraries.libs as libraries
 import output.console as console
 import compiler.ast as ast
 import compiler.ast_visitor as ast_visitor
-from simulator.compiler.ast import StringTypeNode, VoidTypeNode
 
 
 class Semantic:
@@ -742,7 +741,7 @@ class SemanticAnalyzer(ast_visitor.ASTVisitor):
         bitwise_expression.set_type(bitwise_expression.left.type)
         return None
 
-    def visit_compound_assigment(self, compound_asigment: ast.CompoundAssignmentNode, param):
+    def visit_compound_assignment(self, compound_asigment: ast.CompoundAssignmentNode, param):
         if compound_asigment.left is not None:
             compound_asigment.left.set_function(compound_asigment.function)
             compound_asigment.left.accept(self, param)

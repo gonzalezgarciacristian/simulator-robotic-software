@@ -174,7 +174,7 @@ class ASTVisitor:
             bitwise_expression.right.accept(self, param)
         return None
 
-    def visit_compound_assigment(self, compound_asigment: ast.CompoundAssignmentNode, param):
+    def visit_compound_assignment(self, compound_asigment: ast.CompoundAssignmentNode, param):
         if compound_asigment.left is not None:
             compound_asigment.left.accept(self, param)
         if compound_asigment.right is not None:

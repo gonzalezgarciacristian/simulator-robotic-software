@@ -122,12 +122,15 @@ class MobileHUD(HUD):
         self.canvas.create_text(100, 75, text=text, font=(
             "Consolas", 13), anchor="w", fill="white", tags="cir")
 
-    def set_detect_obstacle(self, dists):
+    def set_detect_obstacle(self, dists, unit=None):
         """
         Displays if the robot is detecting an obstacle, and the distance
         to it.
         Arguments:
             dists: a list with the distances
+            unit: measurement unit shown after each distance (e.g. "cm"
+                for readings coming from the physical robot). None keeps
+                the legacy display: canvas pixels with border adjustment.
         """
         self.canvas.delete("obs")
         text = ""
@@ -137,7 +140,10 @@ class MobileHUD(HUD):
                 text += " | "
             if dists[i] != -1:
                 text += "Si"
-                dist_text = str(dists[i] - 1)
+                if unit is None:
+                    dist_text = str(dists[i] - 1)
+                else:
+                    dist_text = "{} {}".format(dists[i], unit)
             else:
                 text += "No"
             self.canvas.create_text(360, 50 + (25 * i), text=dist_text, font=("Consolas", 13), anchor="w", tags="obs",

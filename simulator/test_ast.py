@@ -1,5 +1,7 @@
 import unittest
 
+from path_helper import tests_path
+
 from antlr4 import *
 from compiler.ArduinoLexer import ArduinoLexer
 from compiler.ArduinoParser import ArduinoParser
@@ -24,7 +26,7 @@ class TestBaseAST(unittest.TestCase):
 
 
 class TestInclude(TestBaseAST):
-    file = "tests/file-tests/include.txt"
+    file = tests_path("file-tests", "include.txt")
 
     def test_file_name(self):
         includes = self.ast.includes
@@ -35,7 +37,7 @@ class TestInclude(TestBaseAST):
 
 
 class TestGlobalDefinition(TestBaseAST):
-    file = "tests/file-tests/g-def.txt"
+    file = tests_path("file-tests", "g-def.txt")
 
     def setUp(self):
         super().setUp()
@@ -145,7 +147,7 @@ class TestGlobalDefinition(TestBaseAST):
 
 
 class TestFunctionDefinition(TestBaseAST):
-    file = "tests/file-tests/f-def.txt"
+    file = tests_path("file-tests", "f-def.txt")
 
     def setUp(self):
         super().setUp()
@@ -236,7 +238,7 @@ class TestFunctionDefinition(TestBaseAST):
 
 
 class TestTerminals(TestBaseAST):
-    file = "tests/file-tests/terminals.txt"
+    file = tests_path("file-tests", "terminals.txt")
 
     def setUp(self):
         super().setUp()
@@ -286,7 +288,7 @@ class TestTerminals(TestBaseAST):
 
 
 class TestFunctionCall(TestBaseAST):
-    file = "tests/file-tests/f-calls.txt"
+    file = tests_path("file-tests", "f-calls.txt")
 
     def setUp(self):
         super().setUp()
@@ -356,7 +358,7 @@ class TestFunctionCall(TestBaseAST):
 
 
 class TestConditionals(TestBaseAST):
-    file = "tests/file-tests/conditionals.txt"
+    file = tests_path("file-tests", "conditionals.txt")
 
     def setUp(self):
         super().setUp()
@@ -423,7 +425,7 @@ class TestConditionals(TestBaseAST):
 
 
 class TestBucles(TestBaseAST):
-    file = "tests/file-tests/loops.txt"
+    file = tests_path("file-tests", "loops.txt")
 
     def setUp(self):
         super().setUp()
@@ -487,7 +489,7 @@ class TestBucles(TestBaseAST):
 
 
 class TestAsignations(TestBaseAST):
-    file = "tests/file-tests/assignments.txt"
+    file = tests_path("file-tests", "assignments.txt")
 
     def setUp(self):
         super().setUp()
@@ -534,7 +536,7 @@ class TestAsignations(TestBaseAST):
 
 
 class TestBitwise(TestBaseAST):
-    file = "tests/file-tests/bitwise.txt"
+    file = tests_path("file-tests", "bitwise.txt")
 
     def setUp(self):
         super().setUp()
@@ -572,7 +574,7 @@ class TestBitwise(TestBaseAST):
 
 
 class TestLocalDefinition(TestBaseAST):
-    file = "tests/file-tests/local-def.txt"
+    file = tests_path("file-tests", "local-def.txt")
 
     def setUp(self):
         super().setUp()
@@ -755,7 +757,7 @@ class TestLocalDefinition(TestBaseAST):
 
 
 class TestIncDec(TestBaseAST):
-    file = "tests/file-tests/incdec.txt"
+    file = tests_path("file-tests", "incdec.txt")
 
     def setUp(self):
         super().setUp()
@@ -775,7 +777,7 @@ class TestIncDec(TestBaseAST):
 
 
 class TestSpecials(TestBaseAST):
-    file = "tests/file-tests/specials.txt"
+    file = tests_path("file-tests", "specials.txt")
 
     def setUp(self):
         super().setUp()
@@ -796,7 +798,7 @@ class TestSpecials(TestBaseAST):
 
 
 class TestAritmetic(TestBaseAST):
-    file = "tests/file-tests/aritmetics.txt"
+    file = tests_path("file-tests", "aritmetics.txt")
 
     def setUp(self):
         super().setUp()
@@ -832,7 +834,7 @@ class TestAritmetic(TestBaseAST):
 
 
 class TestBoolean(TestBaseAST):
-    file = "tests/file-tests/boolean.txt"
+    file = tests_path("file-tests", "boolean.txt")
 
     def setUp(self):
         super().setUp()
@@ -887,7 +889,7 @@ class TestBoolean(TestBaseAST):
 
 
 class TestArrays(TestBaseAST):
-    file = "tests/file-tests/arrays.txt"
+    file = tests_path("file-tests", "arrays.txt")
 
     def setUp(self):
         super().setUp()
@@ -1013,7 +1015,7 @@ class TestArrays(TestBaseAST):
 
 
 class TestArrayAccess(TestBaseAST):
-    file = "tests/file-tests/array-access.txt"
+    file = tests_path("file-tests", "array-access.txt")
 
     def setUp(self):
         super().setUp()
@@ -1043,7 +1045,7 @@ class TestArrayAccess(TestBaseAST):
 
 
 class TestConversion(TestBaseAST):
-    file = "tests/file-tests/conversions.txt"
+    file = tests_path("file-tests", "conversions.txt")
 
     def setUp(self):
         super().setUp()

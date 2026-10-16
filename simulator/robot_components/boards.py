@@ -249,7 +249,10 @@ class ArduinoUno(Board):
             "pin": pin
         }
         self.pines.append(att_pin)
-        print(self.pines)
+        # Además de registrar el pin para el dibujo de la placa (self.pines), hay que
+        # registrarlo en used_pins (como el resto de placas) para que la asignación de
+        # pines del robot tenga efecto y digitalRead/analogRead (board.read) lo lea.
+        return super().attach_pin(pin, component)
 
     def draw_buttons(self, x, y):
         button1 = {

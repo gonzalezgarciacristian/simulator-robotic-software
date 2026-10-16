@@ -32,6 +32,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='main',
+    contents_directory='.',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

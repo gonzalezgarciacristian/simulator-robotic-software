@@ -12,7 +12,8 @@ build/
 dist/
 doc/
 gamification_logs/
+mqtt_*.json
 .VSCodeCounter/
 stats.dump
-
+.venv
 *undo-tree*
